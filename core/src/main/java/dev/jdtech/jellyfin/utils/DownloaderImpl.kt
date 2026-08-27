@@ -19,8 +19,10 @@ import dev.jdtech.jellyfin.models.FindroidSource
 import dev.jdtech.jellyfin.models.FindroidSources
 import dev.jdtech.jellyfin.models.FindroidTrickplayInfo
 import dev.jdtech.jellyfin.models.UiText
+import dev.jdtech.jellyfin.models.toFindroidEpisode
 import dev.jdtech.jellyfin.models.toFindroidEpisodeDto
 import dev.jdtech.jellyfin.models.toFindroidMediaStreamDto
+import dev.jdtech.jellyfin.models.toFindroidMovie
 import dev.jdtech.jellyfin.models.toFindroidMovieDto
 import dev.jdtech.jellyfin.models.toFindroidSeasonDto
 import dev.jdtech.jellyfin.models.toFindroidSegmentsDto
@@ -260,6 +262,17 @@ class DownloaderImpl(
             val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
             return Pair(downloadStatus, reason)
         }
+    }
+
+    override suspend fun getDownloadedItem(itemId: UUID): FindroidItem? {
+        val userId = jellyfinRepository.getUserId()
+        val movie = database.getMovies().firstOrNull { it.id == itemId }
+        if (movie != null) {
+            return movie.toFindroidMovie(database, userId)
+        }
+        return database.getEpisodes()
+            .firstOrNull { it.id == itemId }
+            ?.toFindroidEpisode(database, userId)
     }
 
     private fun downloadExternalMediaStreams(

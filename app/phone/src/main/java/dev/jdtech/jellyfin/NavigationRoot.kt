@@ -41,6 +41,7 @@ import dev.jdtech.jellyfin.models.FindroidMovie
 import dev.jdtech.jellyfin.models.FindroidSeason
 import dev.jdtech.jellyfin.models.FindroidShow
 import dev.jdtech.jellyfin.presentation.film.CollectionScreen
+import dev.jdtech.jellyfin.presentation.film.DownloadQueueScreen
 import dev.jdtech.jellyfin.presentation.film.DownloadsScreen
 import dev.jdtech.jellyfin.presentation.film.EpisodeScreen
 import dev.jdtech.jellyfin.presentation.film.FavoritesScreen
@@ -109,6 +110,8 @@ data class LibraryRoute(
     val filePath: String,
 )
 
+@Serializable data object DownloadQueueRoute
+
 @Serializable data object AboutRoute
 
 data class TabBarItem(
@@ -132,6 +135,12 @@ val downloadsTab =
         icon = CoreR.drawable.ic_download,
         route = DownloadsRoute,
     )
+val downloadQueueTab =
+    TabBarItem(
+        title = CoreR.string.title_downloading,
+        icon = CoreR.drawable.ic_arrow_down_up,
+        route = DownloadQueueRoute,
+    )
 
 @Composable
 fun NavigationRoot(
@@ -139,6 +148,7 @@ fun NavigationRoot(
     hasServers: Boolean,
     hasCurrentServer: Boolean,
     hasCurrentUser: Boolean,
+    hasDownloadsInProgress: Boolean,
 ) {
     val isOfflineMode = LocalOfflineMode.current
 
@@ -150,11 +160,16 @@ fun NavigationRoot(
             else -> WelcomeRoute
         }
 
-    val navigationItems =
-        when (isOfflineMode) {
-            false -> listOf(homeTab, mediaTab, downloadsTab)
-            true -> listOf(homeTab, downloadsTab)
+    val navigationItems = buildList {
+        add(homeTab)
+        if (!isOfflineMode) {
+            add(mediaTab)
         }
+        add(downloadsTab)
+        if (hasDownloadsInProgress) {
+            add(downloadQueueTab)
+        }
+    }
     val navigationItemClassNames = navigationItems.map { it.route::class.qualifiedName }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -163,6 +178,16 @@ fun NavigationRoot(
 
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in navigationItemClassNames && !searchExpanded
+
+    LaunchedEffect(hasDownloadsInProgress, currentRoute) {
+        if (!hasDownloadsInProgress && currentRoute == DownloadQueueRoute::class.qualifiedName) {
+            navController.navigate(DownloadsRoute) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
 
     val navigationSuiteScaffoldState = rememberNavigationSuiteScaffoldState()
 
@@ -330,6 +355,7 @@ fun NavigationRoot(
                     onSearchExpand = { searchExpanded = it },
                 )
             }
+            composable<DownloadQueueRoute> { DownloadQueueScreen() }
             composable<DownloadsRoute> {
                 DownloadsScreen(
                     onItemClick = { item ->

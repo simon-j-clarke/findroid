@@ -6,13 +6,8 @@ import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
-import dev.jdtech.jellyfin.models.FindroidItem
-import dev.jdtech.jellyfin.models.toFindroidEpisode
-import dev.jdtech.jellyfin.models.toFindroidMovie
 import dev.jdtech.jellyfin.models.toFindroidSource
-import dev.jdtech.jellyfin.repository.JellyfinRepository
 import java.io.File
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +21,6 @@ class DownloadReceiver : BroadcastReceiver() {
     @Inject lateinit var downloader: Downloader
 
     @Inject lateinit var downloadQueue: DownloadQueue
-
-    @Inject lateinit var repository: JellyfinRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != "android.intent.action.DOWNLOAD_COMPLETE") {
@@ -61,7 +54,7 @@ class DownloadReceiver : BroadcastReceiver() {
             if (successful && File(source.path).renameTo(File(path))) {
                 database.setSourcePath(source.id, path)
             } else {
-                val item = getDownloadedItem(source.itemId)
+                val item = downloader.getDownloadedItem(source.itemId)
                 if (item != null) {
                     downloader.deleteItem(item, source.toFindroidSource(database))
                 } else {
@@ -81,16 +74,5 @@ class DownloadReceiver : BroadcastReceiver() {
             File(mediaStream.path).delete()
             database.deleteMediaStream(mediaStream.id)
         }
-    }
-
-    private fun getDownloadedItem(itemId: UUID): FindroidItem? {
-        val userId = repository.getUserId()
-        val movie = database.getMovies().firstOrNull { it.id == itemId }
-        if (movie != null) {
-            return movie.toFindroidMovie(database, userId)
-        }
-        return database.getEpisodes()
-            .firstOrNull { it.id == itemId }
-            ?.toFindroidEpisode(database, userId)
     }
 }

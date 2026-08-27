@@ -1,6 +1,5 @@
 package dev.jdtech.jellyfin.core.presentation.downloader
 
-import android.app.DownloadManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -8,21 +7,17 @@ import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
 import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.FindroidSourceType
-import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.models.isDownloaded
 import dev.jdtech.jellyfin.utils.DownloadQueue
 import dev.jdtech.jellyfin.utils.Downloader
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -95,39 +90,12 @@ constructor(private val downloader: Downloader, private val downloadQueue: Downl
         }
     }
 
-    // The queue knows which item is downloading, the progress of that download is owned by the
-    // download manager.
     private suspend fun toState(entries: List<DownloadQueueEntryDto>): DownloaderState {
-        entries
-            .firstOrNull { it.state == DownloadState.RUNNING }
-            ?.let { entry ->
-                val (status, progress) = downloader.getProgress(entry.downloadId)
-                return DownloaderState(
-                    status = status,
-                    progress = progress.coerceAtLeast(0).div(100f),
-                )
-            }
-
-        if (entries.any { it.state == DownloadState.QUEUED }) {
-            return DownloaderState(status = DownloadManager.STATUS_PENDING)
-        }
-
-        entries
-            .firstOrNull { it.state == DownloadState.FAILED }
-            ?.let { entry ->
-                return DownloaderState(
-                    status = DownloadManager.STATUS_FAILED,
-                    errorText = entry.errorMessage?.let { UiText.DynamicString(it) },
-                )
-            }
-
-        return DownloaderState()
-    }
-
-    private fun progressTicker(): Flow<Unit> = flow {
-        while (true) {
-            emit(Unit)
-            delay(1000L)
-        }
+        val entry =
+            entries.firstOrNull { it.state == DownloadState.RUNNING }
+                ?: entries.firstOrNull { it.state == DownloadState.QUEUED }
+                ?: entries.firstOrNull { it.state == DownloadState.FAILED }
+                ?: return DownloaderState()
+        return entry.toDownloaderState(downloader)
     }
 }

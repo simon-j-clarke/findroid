@@ -22,6 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -34,7 +35,12 @@ import dev.jdtech.jellyfin.presentation.theme.spacings
 import kotlin.math.roundToInt
 
 @Composable
-fun DownloaderCard(state: DownloaderState, onCancelClick: () -> Unit, onRetryClick: () -> Unit) {
+fun DownloaderCard(
+    state: DownloaderState,
+    onCancelClick: () -> Unit,
+    onRetryClick: () -> Unit,
+    title: String? = null,
+) {
     val animatedProgress by
         animateFloatAsState(
             targetValue = state.progress,
@@ -76,6 +82,15 @@ fun DownloaderCard(state: DownloaderState, onCancelClick: () -> Unit, onRetryCli
             horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacings.medium),
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                if (title != null) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(MaterialTheme.spacings.extraSmall))
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

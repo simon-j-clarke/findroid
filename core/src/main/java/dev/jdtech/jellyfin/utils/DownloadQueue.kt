@@ -78,6 +78,17 @@ constructor(
             start()
         }
 
+    suspend fun cancel(itemId: UUID) =
+        withContext(Dispatchers.IO) {
+            val item = downloader.getDownloadedItem(itemId)
+            if (item != null) {
+                cancel(item)
+            } else {
+                database.deleteDownloadQueueEntries(itemId)
+                start()
+            }
+        }
+
     suspend fun retry(itemId: UUID) =
         withContext(Dispatchers.IO) {
             val entry = database.getDownloadQueueEntry(itemId) ?: return@withContext

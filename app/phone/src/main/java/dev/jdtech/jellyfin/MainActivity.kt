@@ -25,6 +25,8 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
+            val hasDownloadsInProgress by
+                viewModel.hasDownloadsInProgress.collectAsStateWithLifecycle()
 
             FindroidTheme(dynamicColor = state.isDynamicColors) {
                 val navController = rememberNavController()
@@ -35,6 +37,7 @@ class MainActivity : AppCompatActivity() {
                             hasServers = state.hasServers,
                             hasCurrentServer = state.hasCurrentServer,
                             hasCurrentUser = state.hasCurrentUser,
+                            hasDownloadsInProgress = hasDownloadsInProgress,
                         )
                     }
                 }
