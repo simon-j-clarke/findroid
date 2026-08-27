@@ -7,7 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
-import dev.jdtech.jellyfin.models.DownloadQueueState
+import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.FindroidEpisodeDto
 import dev.jdtech.jellyfin.models.FindroidMediaStreamDto
 import dev.jdtech.jellyfin.models.FindroidMovieDto
@@ -272,7 +272,7 @@ interface ServerDatabaseDao {
     @Query("SELECT COUNT(*) FROM downloadqueue") fun getDownloadQueueSize(): Flow<Int>
 
     @Query("SELECT * FROM downloadqueue WHERE state = :state")
-    fun getDownloadQueueEntriesByState(state: DownloadQueueState): List<DownloadQueueEntryDto>
+    fun getDownloadQueueEntriesByState(state: DownloadState): List<DownloadQueueEntryDto>
 
     @Query("SELECT * FROM downloadqueue WHERE itemId = :itemId LIMIT 1")
     fun getDownloadQueueEntry(itemId: UUID): DownloadQueueEntryDto?

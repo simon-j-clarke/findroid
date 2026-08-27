@@ -11,7 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
-import dev.jdtech.jellyfin.models.DownloadQueueState
+import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.models.isDownloaded
@@ -46,6 +46,13 @@ constructor(
                 if (item.isDownloaded()) {
                     continue
                 }
+                val existing = database.getDownloadQueueEntry(item.id)
+                if (existing != null) {
+                    if (existing.state == DownloadState.FAILED) {
+                        database.updateDownloadQueueEntry(existing.toQueued())
+                    }
+                    continue
+                }
                 val sourceId = item.sources.firstOrNull()?.id ?: continue
                 database.insertDownloadQueueEntry(
                     DownloadQueueEntryDto(
@@ -53,7 +60,7 @@ constructor(
                         sourceId = sourceId,
                         name = item.name,
                         storageIndex = storageIndex,
-                        state = DownloadQueueState.QUEUED,
+                        state = DownloadState.QUEUED,
                         queuedAt = queuedAt,
                     )
                 )
@@ -74,15 +81,7 @@ constructor(
     suspend fun retry(itemId: UUID) =
         withContext(Dispatchers.IO) {
             val entry = database.getDownloadQueueEntry(itemId) ?: return@withContext
-            database.updateDownloadQueueEntry(
-                entry.copy(
-                    state = DownloadQueueState.QUEUED,
-                    attempt = 0,
-                    nextAttemptAt = null,
-                    errorMessage = null,
-                    downloadId = null,
-                )
-            )
+            database.updateDownloadQueueEntry(entry.toQueued())
             start()
         }
 
@@ -98,7 +97,7 @@ constructor(
     suspend fun onDownloadStarted(entry: DownloadQueueEntryDto, downloadId: Long) =
         withContext(Dispatchers.IO) {
             database.updateDownloadQueueEntry(
-                entry.copy(state = DownloadQueueState.RUNNING, downloadId = downloadId)
+                entry.copy(state = DownloadState.RUNNING, downloadId = downloadId)
             )
         }
 
@@ -145,7 +144,7 @@ constructor(
 
         database.updateDownloadQueueEntry(
             entry.copy(
-                state = DownloadQueueState.FAILED,
+                state = DownloadState.FAILED,
                 downloadId = null,
                 attempt = attempt,
                 nextAttemptAt = retryDelay?.let { System.currentTimeMillis() + it },
@@ -153,6 +152,16 @@ constructor(
             )
         )
         start(retryDelay ?: 0)
+    }
+
+    private fun DownloadQueueEntryDto.toQueued(): DownloadQueueEntryDto {
+        return copy(
+            state = DownloadState.QUEUED,
+            attempt = 0,
+            nextAttemptAt = null,
+            errorMessage = null,
+            downloadId = null,
+        )
     }
 
     private fun isRetryable(reason: Int): Boolean {

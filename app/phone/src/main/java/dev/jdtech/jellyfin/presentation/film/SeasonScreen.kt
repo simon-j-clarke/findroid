@@ -73,11 +73,9 @@ fun SeasonScreen(
 
     LaunchedEffect(true) { viewModel.loadSeason(seasonId = seasonId) }
 
-    ObserveAsEvents(downloaderViewModel.events) {
-        // As episodes are downloaded, reload season to render
-        // the download badges
-        viewModel.loadSeason(seasonId = seasonId)
-    }
+    LaunchedEffect(state.episodes) { downloaderViewModel.track(state.episodes) }
+
+    ObserveAsEvents(downloaderViewModel.events) { viewModel.loadSeason(seasonId = seasonId) }
 
     SeasonScreenLayout(
         state = state,
@@ -161,12 +159,10 @@ private fun SeasonScreenLayout(
                         },
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.default.div(2)))
-                    // Using any because we want the delete button to be visible if ANY episode
-                    // in the season has been downloaded
                     val isSeasonDownloaded = state.episodes.any { it.isDownloaded() }
-                    // Only want to show the download button if any episodes still haven't
-                    // been downloaded
-                    val canSeasonBeDownloaded = state.episodes.any { it.canDownload } && !state.episodes.all { it.isDownloaded() }
+                    val canSeasonBeDownloaded =
+                        state.episodes.any { it.canDownload } &&
+                            !state.episodes.all { it.isDownloaded() }
                     ItemButtonsBar(
                         item = season,
                         downloaderState = downloaderState,
@@ -190,18 +186,14 @@ private fun SeasonScreenLayout(
                         onTrailerClick = {},
                         onDownloadClick = { storageIndex ->
                             onDownloaderAction(
-                                DownloaderAction.DownloadMany(state.episodes, storageIndex)
+                                DownloaderAction.Download(state.episodes, storageIndex)
                             )
                         },
                         onDownloadCancelClick = {
-                            onDownloaderAction(
-                                DownloaderAction.CancelDownloadMany
-                            )
+                            onDownloaderAction(DownloaderAction.CancelDownload(state.episodes))
                         },
                         onDownloadDeleteClick = {
-                            onDownloaderAction(
-                                DownloaderAction.DeleteDownloadMany(state.episodes)
-                            )
+                            onDownloaderAction(DownloaderAction.DeleteDownload(state.episodes))
                         },
                         modifier =
                             Modifier.padding(start = paddingStart, end = paddingEnd).fillMaxWidth(),

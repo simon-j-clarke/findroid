@@ -9,7 +9,7 @@ data class DownloadQueueEntryDto(
     val sourceId: String,
     val name: String,
     val storageIndex: Int,
-    val state: DownloadQueueState,
+    val state: DownloadState,
     val queuedAt: Long,
     val downloadId: Long? = null,
     val attempt: Int = 0,
@@ -17,7 +17,7 @@ data class DownloadQueueEntryDto(
     val errorMessage: String? = null,
 )
 
-enum class DownloadQueueState {
+enum class DownloadState {
     QUEUED,
     RUNNING,
     FAILED,

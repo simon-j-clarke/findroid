@@ -1,235 +1,133 @@
 package dev.jdtech.jellyfin.core.presentation.downloader
 
 import android.app.DownloadManager
-import android.os.Handler
-import android.os.Looper
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
+import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.FindroidSourceType
-import dev.jdtech.jellyfin.models.isDownloading
+import dev.jdtech.jellyfin.models.UiText
+import dev.jdtech.jellyfin.models.isDownloaded
+import dev.jdtech.jellyfin.utils.DownloadQueue
 import dev.jdtech.jellyfin.utils.Downloader
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import javax.inject.Inject
-import kotlinx.coroutines.Runnable
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class DownloaderViewModel @Inject constructor(private val downloader: Downloader) : ViewModel() {
-    private val _state = MutableStateFlow(DownloaderState())
-    val state = _state.asStateFlow()
+class DownloaderViewModel
+@Inject
+constructor(private val downloader: Downloader, private val downloadQueue: DownloadQueue) :
+    ViewModel() {
+    private val trackedItems = MutableStateFlow<List<FindroidItem>>(emptyList())
 
     private val eventsChannel = Channel<DownloaderEvent>()
     val events = eventsChannel.receiveAsFlow()
 
-    var downloadId: Long? = null
-    var downloadItem: FindroidItem? = null
-
-    private val handler = Handler(Looper.getMainLooper())
-    private var itemsDownloaderJob: Job? = null
-
-    fun update(item: FindroidItem) {
-        viewModelScope.launch {
-            if (item.isDownloading()) {
-                val source =
-                    item.sources.firstOrNull { it.type == FindroidSourceType.LOCAL }
-                        ?: return@launch
-                this@DownloaderViewModel.downloadId = source.downloadId
-                pollDownloadProgress(source.downloadId)
+    val state: StateFlow<DownloaderState> =
+        combine(trackedItems, downloadQueue.getQueue(), progressTicker()) { items, queue, _ ->
+                toState(queue.filter { entry -> items.any { it.id == entry.itemId } })
             }
-        }
-    }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), DownloaderState())
 
-    private fun download(item: FindroidItem, storageIndex: Int = 0) {
+    init {
         viewModelScope.launch {
-            _state.emit(DownloaderState(status = DownloadManager.STATUS_PENDING))
-            val (downloadId, uiText) =
-                downloader.downloadItem(
-                    item = item,
-                    sourceId = item.sources.first().id,
-                    storageIndex = storageIndex,
-                )
-            if (downloadId != -1L) {
-                this@DownloaderViewModel.downloadId = downloadId
-                pollDownloadProgress(downloadId)
-            } else {
-                _state.emit(
-                    DownloaderState(status = DownloadManager.STATUS_FAILED, errorText = uiText)
-                )
-            }
-        }
-    }
-
-    private fun downloadMany(items: List<FindroidItem>, storageIndex: Int) {
-        // Safeguard against launching two download jobs at once
-        if (itemsDownloaderJob?.isActive == true) {
-            return
-        }
-
-        // Using Default dispatcher because there is no reason to run this on the UI-thread
-        itemsDownloaderJob = viewModelScope.launch(Dispatchers.Default) {
-            _state.emit(DownloaderState(status = DownloadManager.STATUS_PENDING))
-            items.forEachIndexed { index, item ->
-                _state.emit(
-                    DownloaderState(
-                        status = DownloadManager.STATUS_RUNNING,
-                        progress = index.toFloat() / items.size,
-                    )
-                )
-
-                // If already downloaded skip
-                if (item.sources.any { src -> src.type == FindroidSourceType.LOCAL }) {
-                    // return to the for-loop level to match a continue statement
-                    return@forEachIndexed
+            combine(trackedItems, downloadQueue.getQueue()) { items, queue ->
+                    queue.count { entry -> items.any { it.id == entry.itemId } }
                 }
-
-                val (downloadId, uiText) =
-                    downloader.downloadItem(
-                        item = item,
-                        sourceId = item.sources.first().id,
-                        storageIndex = storageIndex,
-                    )
-
-                if (downloadId == -1L) {
-                    _state.emit(
-                        DownloaderState(status = DownloadManager.STATUS_FAILED, errorText = uiText)
-                    )
-                    // Trigger rendering updated badges in UI by sending an event. Which event
-                    // doesn't matter.
-                    eventsChannel.trySend(DownloaderEvent.Successful)
-                    return@launch
-                }
-
-                // Keep track so we can cancel the download
-                this@DownloaderViewModel.downloadItem = item
-                this@DownloaderViewModel.downloadId = downloadId
-                var status = DownloadManager.STATUS_RUNNING
-                while (status == DownloadManager.STATUS_RUNNING || status == DownloadManager.STATUS_PENDING || status == DownloadManager.STATUS_PAUSED) {
-                    // Check download status. UI renders progress on the per item level,
-                    // so there is nothing to emit. We are only waiting for this item to finish
-                    // downloading.
-                    delay(100L)
-                    status = downloader.getProgress(downloadId).first
-                }
-
-                if (status == DownloadManager.STATUS_FAILED) {
-                    // Download failed. Emit the failed state to the ser and terminate the loop.
-                    _state.emit(
-                        DownloaderState(status = DownloadManager.STATUS_FAILED, errorText = uiText)
-                    )
-                    // Trigger rendering updated badges in UI by sending an event. Which event
-                    // doesn't matter.
-                    eventsChannel.trySend(DownloaderEvent.Successful)
-                    return@launch
-                }
-            }
-
-            _state.emit(
-                DownloaderState(status = DownloadManager.STATUS_SUCCESSFUL)
-            )
-            // Trigger rendering updated badges in UI.
-            eventsChannel.trySend(DownloaderEvent.Successful)
-        }
-    }
-
-    private fun cancelDownload(item: FindroidItem) {
-        viewModelScope.launch {
-            // Stop progress polling
-            handler.removeCallbacksAndMessages(null)
-
-            // Cancel the download
-            downloadId?.let { downloader.cancelDownload(item = item, downloadId = it) }
-
-            // Emit empty DownloadState
-            _state.emit(DownloaderState())
-        }
-    }
-
-    private fun cancelDownloadMany() {
-        viewModelScope.launch(Dispatchers.Default) {
-            // Stop the download job
-            itemsDownloaderJob?.cancel("User pressed cancel button")
-
-            // Cancel the download
-            downloadId?.let { downloadId ->
-                downloadItem?.let { downloadItem ->
-                    downloader.cancelDownload(item = downloadItem, downloadId = downloadId)
-                }
-            }
-
-            // Emit empty DownloadState
-            _state.emit(DownloaderState())
-            // Send event to trigger reload
-            eventsChannel.send(DownloaderEvent.Deleted)
-        }
-    }
-
-    private fun deleteDownload(item: FindroidItem) {
-        viewModelScope.launch {
-            downloader.deleteItem(
-                item = item,
-                source = item.sources.first { it.type == FindroidSourceType.LOCAL },
-            )
-            eventsChannel.send(DownloaderEvent.Deleted)
-        }
-    }
-
-    private fun deleteDownloadedMany(items: List<FindroidItem>) {
-        // Only if a source has type local can it be deleted
-        items
-            .filter { ep -> ep.sources.any { src -> src.type == FindroidSourceType.LOCAL } }
-            .forEach(::deleteDownload)
-    }
-
-    private fun pollDownloadProgress(downloadId: Long?) {
-        handler.removeCallbacksAndMessages(null)
-        val downloadProgressRunnable =
-            object : Runnable {
-                override fun run() {
-                    viewModelScope.launch {
-                        val (status, progress) = downloader.getProgress(downloadId)
-                        _state.emit(
-                            DownloaderState(
-                                status = status,
-                                progress = progress.coerceAtLeast(0) / 100f,
-                            )
-                        )
-                    }
-
-                    if (_state.value.status == DownloadManager.STATUS_SUCCESSFUL) {
-                        eventsChannel.trySend(DownloaderEvent.Successful)
-                    }
-
-                    if (_state.value.isDownloading) {
-                        handler.postDelayed(this, 1000L)
+                .distinctUntilChanged()
+                .drop(1)
+                .collect { remaining ->
+                    if (remaining == 0) {
+                        eventsChannel.send(DownloaderEvent.Successful)
                     }
                 }
-            }
-        handler.post(downloadProgressRunnable)
+        }
+    }
+
+    fun track(items: List<FindroidItem>) {
+        trackedItems.value = items
     }
 
     fun onAction(action: DownloaderAction) {
         when (action) {
-            is DownloaderAction.Download -> download(action.item, action.storageIndex)
-            is DownloaderAction.DownloadMany -> downloadMany(action.items, action.storageIndex)
-            is DownloaderAction.DeleteDownload -> deleteDownload(action.item)
-            is DownloaderAction.DeleteDownloadMany -> deleteDownloadedMany(action.items)
-            is DownloaderAction.CancelDownload -> cancelDownload(action.item)
-            DownloaderAction.CancelDownloadMany -> cancelDownloadMany()
+            is DownloaderAction.Download -> download(action.items, action.storageIndex)
+            is DownloaderAction.CancelDownload -> cancelDownload(action.items)
+            is DownloaderAction.DeleteDownload -> deleteDownload(action.items)
         }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        handler.removeCallbacksAndMessages(null)
-        itemsDownloaderJob?.cancel("onCleared")
+    private fun download(items: List<FindroidItem>, storageIndex: Int) {
+        viewModelScope.launch { downloadQueue.enqueue(items, storageIndex) }
+    }
+
+    private fun cancelDownload(items: List<FindroidItem>) {
+        viewModelScope.launch {
+            for (item in items) {
+                downloadQueue.cancel(item)
+            }
+            eventsChannel.send(DownloaderEvent.Successful)
+        }
+    }
+
+    private fun deleteDownload(items: List<FindroidItem>) {
+        viewModelScope.launch {
+            for (item in items.filter { it.isDownloaded() }) {
+                downloader.deleteItem(
+                    item = item,
+                    source = item.sources.first { it.type == FindroidSourceType.LOCAL },
+                )
+            }
+            eventsChannel.send(DownloaderEvent.Deleted)
+        }
+    }
+
+    // The queue knows which item is downloading, the progress of that download is owned by the
+    // download manager.
+    private suspend fun toState(entries: List<DownloadQueueEntryDto>): DownloaderState {
+        entries
+            .firstOrNull { it.state == DownloadState.RUNNING }
+            ?.let { entry ->
+                val (status, progress) = downloader.getProgress(entry.downloadId)
+                return DownloaderState(
+                    status = status,
+                    progress = progress.coerceAtLeast(0).div(100f),
+                )
+            }
+
+        if (entries.any { it.state == DownloadState.QUEUED }) {
+            return DownloaderState(status = DownloadManager.STATUS_PENDING)
+        }
+
+        entries
+            .firstOrNull { it.state == DownloadState.FAILED }
+            ?.let { entry ->
+                return DownloaderState(
+                    status = DownloadManager.STATUS_FAILED,
+                    errorText = entry.errorMessage?.let { UiText.DynamicString(it) },
+                )
+            }
+
+        return DownloaderState()
+    }
+
+    private fun progressTicker(): Flow<Unit> = flow {
+        while (true) {
+            emit(Unit)
+            delay(1000L)
+        }
     }
 }

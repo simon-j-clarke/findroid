@@ -51,11 +51,8 @@ fun ItemButtonsBar(
     onTrailerClick: (uri: String) -> Unit,
     modifier: Modifier = Modifier,
     downloaderState: DownloaderState? = null,
-    // Used by seasons, episodes are loaded in the state and are used to
-    // determine this. Combined with item
+    // Seasons are downloaded per episode, so their buttons are driven by the episodes.
     isItemDownloaded: Boolean = false,
-    // Used by seasons, episodes are loaded in the state and are used to
-    // determine this. Combined with item.
     canDownload: Boolean = false,
     canPlay: Boolean = true,
 ) {
@@ -160,8 +157,7 @@ fun ItemButtonsBar(
                     }
                 }
                 if (downloaderState != null && !downloaderState.isDownloading) {
-                    // Render both Delete and Download buttons for seasons, which may have
-                    // some episodes downloaded and some not.
+                    // A season can be partially downloaded, so both buttons can be shown at once.
                     if (isItemDownloaded || item.isDownloaded()) {
                         FilledTonalIconButton(onClick = { deleteDownloadDialogOpen = true }) {
                             Icon(
@@ -170,8 +166,6 @@ fun ItemButtonsBar(
                             )
                         }
                     }
-                    // canDownload is for seasons. Else, an item should only render the download
-                    // button if item is not downloaded.
                     if (canDownload || (item.canDownload && !item.isDownloaded())) {
                         FilledTonalIconButton(
                             onClick = {

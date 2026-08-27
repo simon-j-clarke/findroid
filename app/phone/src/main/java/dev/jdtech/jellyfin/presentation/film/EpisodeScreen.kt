@@ -82,7 +82,7 @@ fun EpisodeScreen(
     LaunchedEffect(true) { viewModel.loadEpisode(episodeId = episodeId) }
 
     LaunchedEffect(state.episode) {
-        state.episode?.let { episode -> downloaderViewModel.update(episode) }
+        state.episode?.let { episode -> downloaderViewModel.track(listOf(episode)) }
     }
 
     ObserveAsEvents(downloaderViewModel.events) { event ->
@@ -239,13 +239,15 @@ private fun EpisodeScreenLayout(
                         },
                         onTrailerClick = {},
                         onDownloadClick = { storageIndex ->
-                            onDownloaderAction(DownloaderAction.Download(episode, storageIndex))
+                            onDownloaderAction(
+                                DownloaderAction.Download(listOf(episode), storageIndex)
+                            )
                         },
                         onDownloadCancelClick = {
-                            onDownloaderAction(DownloaderAction.CancelDownload(episode))
+                            onDownloaderAction(DownloaderAction.CancelDownload(listOf(episode)))
                         },
                         onDownloadDeleteClick = {
-                            onDownloaderAction(DownloaderAction.DeleteDownload(episode))
+                            onDownloaderAction(DownloaderAction.DeleteDownload(listOf(episode)))
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )

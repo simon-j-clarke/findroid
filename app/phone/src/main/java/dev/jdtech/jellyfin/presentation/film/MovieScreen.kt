@@ -79,7 +79,9 @@ fun MovieScreen(
 
     LaunchedEffect(true) { viewModel.loadMovie(movieId = movieId) }
 
-    LaunchedEffect(state.movie) { state.movie?.let { movie -> downloaderViewModel.update(movie) } }
+    LaunchedEffect(state.movie) {
+        state.movie?.let { movie -> downloaderViewModel.track(listOf(movie)) }
+    }
 
     ObserveAsEvents(downloaderViewModel.events) { event ->
         when (event) {
@@ -236,13 +238,15 @@ private fun MovieScreenLayout(
                         },
                         onTrailerClick = { uri -> onAction(MovieAction.PlayTrailer(uri)) },
                         onDownloadClick = { storageIndex ->
-                            onDownloaderAction(DownloaderAction.Download(movie, storageIndex))
+                            onDownloaderAction(
+                                DownloaderAction.Download(listOf(movie), storageIndex)
+                            )
                         },
                         onDownloadCancelClick = {
-                            onDownloaderAction(DownloaderAction.CancelDownload(movie))
+                            onDownloaderAction(DownloaderAction.CancelDownload(listOf(movie)))
                         },
                         onDownloadDeleteClick = {
-                            onDownloaderAction(DownloaderAction.DeleteDownload(movie))
+                            onDownloaderAction(DownloaderAction.DeleteDownload(listOf(movie)))
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )

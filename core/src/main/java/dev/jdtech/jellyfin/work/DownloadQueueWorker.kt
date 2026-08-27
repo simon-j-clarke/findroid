@@ -10,7 +10,7 @@ import dagger.assisted.AssistedInject
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
-import dev.jdtech.jellyfin.models.DownloadQueueState
+import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.utils.DownloadQueue
@@ -46,10 +46,10 @@ constructor(
     // Downloads outlive the app, so an entry left running by a previous process is only really
     // running when the download manager still knows about it.
     private suspend fun hasRunningDownload(): Boolean {
-        for (entry in database.getDownloadQueueEntriesByState(DownloadQueueState.RUNNING)) {
+        for (entry in database.getDownloadQueueEntriesByState(DownloadState.RUNNING)) {
             val downloadId = entry.downloadId
             if (downloadId == null) {
-                database.updateDownloadQueueEntry(entry.copy(state = DownloadQueueState.QUEUED))
+                database.updateDownloadQueueEntry(entry.copy(state = DownloadState.QUEUED))
                 continue
             }
 
