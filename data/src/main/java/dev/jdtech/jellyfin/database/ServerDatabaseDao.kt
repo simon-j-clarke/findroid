@@ -6,6 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
+import dev.jdtech.jellyfin.models.DownloadQueueState
 import dev.jdtech.jellyfin.models.FindroidEpisodeDto
 import dev.jdtech.jellyfin.models.FindroidMediaStreamDto
 import dev.jdtech.jellyfin.models.FindroidMovieDto
@@ -23,6 +25,7 @@ import dev.jdtech.jellyfin.models.ServerWithAddressesAndUsers
 import dev.jdtech.jellyfin.models.ServerWithUsers
 import dev.jdtech.jellyfin.models.User
 import java.util.UUID
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ServerDatabaseDao {
@@ -257,4 +260,44 @@ interface ServerDatabaseDao {
 
     @Query("SELECT * FROM trickplayInfos WHERE sourceId = :sourceId")
     fun getTrickplayInfo(sourceId: String): FindroidTrickplayInfoDto?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insertDownloadQueueEntry(entry: DownloadQueueEntryDto)
+
+    @Update fun updateDownloadQueueEntry(entry: DownloadQueueEntryDto)
+
+    @Query("SELECT * FROM downloadqueue ORDER BY queuedAt ASC, name ASC")
+    fun getDownloadQueue(): Flow<List<DownloadQueueEntryDto>>
+
+    @Query("SELECT COUNT(*) FROM downloadqueue") fun getDownloadQueueSize(): Flow<Int>
+
+    @Query("SELECT * FROM downloadqueue WHERE state = :state")
+    fun getDownloadQueueEntriesByState(state: DownloadQueueState): List<DownloadQueueEntryDto>
+
+    @Query("SELECT * FROM downloadqueue WHERE itemId = :itemId LIMIT 1")
+    fun getDownloadQueueEntry(itemId: UUID): DownloadQueueEntryDto?
+
+    @Query("SELECT * FROM downloadqueue WHERE downloadId = :downloadId")
+    fun getDownloadQueueEntryByDownloadId(downloadId: Long): DownloadQueueEntryDto?
+
+    @Query(
+        "SELECT * FROM downloadqueue WHERE state = 'QUEUED' OR (state = 'FAILED' AND nextAttemptAt IS NOT NULL AND nextAttemptAt <= :now) ORDER BY queuedAt ASC LIMIT 1"
+    )
+    fun getNextDownloadQueueEntry(now: Long): DownloadQueueEntryDto?
+
+    @Query(
+        "SELECT COUNT(*) FROM downloadqueue WHERE state = 'QUEUED' OR (state = 'FAILED' AND nextAttemptAt IS NOT NULL)"
+    )
+    fun getPendingDownloadQueueSize(): Int
+
+    @Query("DELETE FROM downloadqueue WHERE itemId = :itemId")
+    fun deleteDownloadQueueEntries(itemId: UUID)
+
+    @Query("DELETE FROM downloadqueue WHERE state = 'FAILED'")
+    fun deleteFailedDownloadQueueEntries()
+
+    @Query(
+        "UPDATE downloadqueue SET state = 'QUEUED', attempt = 0, nextAttemptAt = NULL, errorMessage = NULL WHERE state = 'FAILED'"
+    )
+    fun retryFailedDownloadQueueEntries()
 }

@@ -25,6 +25,8 @@ class DownloadReceiver : BroadcastReceiver() {
 
     @Inject lateinit var downloader: Downloader
 
+    @Inject lateinit var downloadQueue: DownloadQueue
+
     @Inject lateinit var repository: JellyfinRepository
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -50,7 +52,7 @@ class DownloadReceiver : BroadcastReceiver() {
     // A completed download is not necessarily a successful one, renaming the partial file of a
     // failed download would mark it as fully downloaded.
     private suspend fun onDownloadComplete(downloadId: Long) {
-        val (status, _) = downloader.getDownloadStatus(downloadId)
+        val (status, reason) = downloader.getDownloadStatus(downloadId)
         val successful = status == DownloadManager.STATUS_SUCCESSFUL
 
         val source = database.getSourceByDownloadId(downloadId)
@@ -67,6 +69,7 @@ class DownloadReceiver : BroadcastReceiver() {
                     database.deleteSource(source.id)
                 }
             }
+            downloadQueue.onDownloadFinished(downloadId, status, reason)
             return
         }
 
