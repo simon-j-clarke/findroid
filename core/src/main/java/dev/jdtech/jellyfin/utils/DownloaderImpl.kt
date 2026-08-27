@@ -249,6 +249,19 @@ class DownloaderImpl(
         return Pair(downloadStatus, progress)
     }
 
+    override suspend fun getDownloadStatus(downloadId: Long): Pair<Int, Int> {
+        val query = DownloadManager.Query().setFilterById(downloadId)
+        downloadManager.query(query).use { cursor ->
+            if (!cursor.moveToFirst()) {
+                return Pair(DownloadManager.STATUS_FAILED, DownloadManager.ERROR_UNKNOWN)
+            }
+            val downloadStatus =
+                cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+            val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+            return Pair(downloadStatus, reason)
+        }
+    }
+
     private fun downloadExternalMediaStreams(
         item: FindroidItem,
         source: FindroidSource,
