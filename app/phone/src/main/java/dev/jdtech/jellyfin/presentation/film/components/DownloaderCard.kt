@@ -123,10 +123,17 @@ fun DownloaderCard(
                     )
                     Text(
                         text =
-                            if (state.bytesTotal > 0) {
-                                animatedProgress.times(100).roundToInt().toString() + "%"
-                            } else {
-                                Formatter.formatShortFileSize(context, state.bytesDownloaded)
+                            when {
+                                state.itemsTotal > 1 ->
+                                    "${state.itemsTotal - state.itemsRemaining}/${state.itemsTotal}"
+                                state.itemsRemaining > 1 ->
+                                    stringResource(
+                                        CoreR.string.download_items_remaining,
+                                        state.itemsRemaining,
+                                    )
+                                state.bytesTotal > 0 ->
+                                    animatedProgress.times(100).roundToInt().toString() + "%"
+                                else -> Formatter.formatShortFileSize(context, state.bytesDownloaded)
                             },
                         color = textColor,
                         style = MaterialTheme.typography.bodyLarge,
@@ -136,6 +143,17 @@ fun DownloaderCard(
                 // A server that reports no size leaves the download manager without a total, so
                 // there is no percentage to show.
                 when {
+                    state.itemsTotal > 1 -> {
+                        LinearProgressIndicator(
+                            progress = {
+                                (state.itemsTotal - state.itemsRemaining).toFloat() /
+                                    state.itemsTotal
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = progressIndicatorColor,
+                            trackColor = progressTrackColor,
+                        )
+                    }
                     state.state == DownloadState.QUEUED || state.bytesTotal == 0L -> {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }

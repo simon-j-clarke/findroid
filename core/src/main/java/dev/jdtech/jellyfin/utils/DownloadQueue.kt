@@ -40,6 +40,9 @@ constructor(
 
     fun getQueueSize(): Flow<Int> = database.getDownloadQueueSize()
 
+    fun getDownloadedEpisodeCount(seriesId: UUID): Flow<Int> =
+        database.getDownloadedEpisodeCount(seriesId)
+
     suspend fun enqueue(items: List<FindroidItem>, storageIndex: Int) =
         withContext(Dispatchers.IO) {
             val queuedAt = System.currentTimeMillis()

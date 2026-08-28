@@ -113,6 +113,7 @@
     <string name="title_downloading">Downloading</string>
     <string name="download_retry_all">Retry all failed downloads</string>
     <string name="download_clear_failed">Clear failed downloads</string>
+    <string name="download_items_remaining">%1$d left</string>
     <string name="download_error_storage">Not enough storage space</string>
     <string name="download_error_network">Network error</string>
     <string name="download_error_server">Server error</string>

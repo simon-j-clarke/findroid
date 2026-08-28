@@ -24,11 +24,14 @@ internal fun DownloadQueueEntryDto.toDownloaderState() =
         errorText = errorMessage?.let { UiText.DynamicString(it) },
     )
 
-internal fun List<DownloadQueueEntryDto>.toDownloaderState(): DownloaderState {
+internal fun List<DownloadQueueEntryDto>.toDownloaderState(itemsTotal: Int = 0): DownloaderState {
     val entry =
         firstOrNull { it.state == DownloadState.RUNNING }
             ?: firstOrNull { it.state == DownloadState.QUEUED }
             ?: firstOrNull { it.state == DownloadState.FAILED }
             ?: return DownloaderState()
-    return entry.toDownloaderState()
+
+    // A download of several items is followed by how many are left, not by the bytes of whichever
+    // one happens to be downloading.
+    return entry.toDownloaderState().copy(itemsRemaining = size, itemsTotal = itemsTotal)
 }

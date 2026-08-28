@@ -8,6 +8,8 @@ data class DownloaderState(
     val progress: Float = 0f,
     val bytesDownloaded: Long = 0,
     val bytesTotal: Long = 0,
+    val itemsRemaining: Int = 0,
+    val itemsTotal: Int = 0,
     val willRetry: Boolean = false,
     val errorText: UiText? = null,
 ) {

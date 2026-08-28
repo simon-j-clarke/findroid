@@ -12,6 +12,7 @@ import dev.jdtech.jellyfin.utils.DownloadQueue
 import dev.jdtech.jellyfin.utils.Downloader
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,11 +20,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.ItemFields
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class DownloaderViewModel
 @Inject
@@ -38,14 +42,23 @@ constructor(
     private val eventsChannel = Channel<DownloaderEvent>()
     val events = eventsChannel.receiveAsFlow()
 
+    private val downloadedInSeries =
+        trackedSeriesId.flatMapLatest { seriesId ->
+            if (seriesId == null) flowOf(0) else downloadQueue.getDownloadedEpisodeCount(seriesId)
+        }
+
     val state: StateFlow<DownloaderState> =
         combine(
                 trackedItems,
                 trackedSeriesId,
+                downloadedInSeries,
                 downloadQueue.getQueue(),
                 progressTicker(),
-            ) { items, seriesId, queue, _ ->
-                toState(queue.filter { entry -> entry.isTracked(items, seriesId) })
+            ) { items, seriesId, downloaded, queue, _ ->
+                val entries = queue.filter { entry -> entry.isTracked(items, seriesId) }
+                val alreadyDownloaded =
+                    if (seriesId != null) downloaded else items.count { it.isDownloaded() }
+                entries.toDownloaderState(itemsTotal = alreadyDownloaded + entries.size)
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), DownloaderState())
 
@@ -127,6 +140,4 @@ constructor(
             eventsChannel.send(DownloaderEvent.Deleted)
         }
     }
-
-    private fun toState(entries: List<DownloadQueueEntryDto>) = entries.toDownloaderState()
 }
