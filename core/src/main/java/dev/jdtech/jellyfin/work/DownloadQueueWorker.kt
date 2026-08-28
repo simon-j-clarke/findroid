@@ -47,9 +47,19 @@ constructor(
                 database.updateDownloadQueueEntry(entry.copy(state = DownloadState.QUEUED))
             }
 
-            while (true) {
-                val entry = database.getNextDownloadQueueEntry(System.currentTimeMillis()) ?: break
-                download(entry)
+            try {
+                while (true) {
+                    val entry =
+                        database.getNextDownloadQueueEntry(System.currentTimeMillis()) ?: break
+                    download(entry)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Failing the work outright would leave the queue with nothing to start it again.
+                Timber.e(e)
+                downloadQueue.start(RECHECK_DELAY)
+                return@withContext Result.success()
             }
 
             // Nothing is due right now, but entries that are waiting on a retry, or that were
@@ -62,25 +72,36 @@ constructor(
         }
 
     private suspend fun download(entry: DownloadQueueEntryDto) {
-        val item = repository.getItem(entry.itemId)
-        if (item == null) {
-            downloadQueue.onDownloadFailedToStart(
-                entry,
-                UiText.StringResource(CoreR.string.unknown_error),
-            )
-            return
-        }
+        val prepared =
+            try {
+                val item =
+                    repository.getItem(entry.itemId)
+                        ?: run {
+                            downloadQueue.onDownloadFailedToStart(
+                                entry,
+                                UiText.StringResource(CoreR.string.unknown_error),
+                            )
+                            return
+                        }
 
-        val (prepared, error) =
-            downloader.prepareDownload(
-                item = item,
-                sourceId = entry.sourceId,
-                storageIndex = entry.storageIndex,
-            )
-        if (prepared == null) {
-            downloadQueue.onDownloadFailedToStart(entry, error)
-            return
-        }
+                val (prepared, error) =
+                    downloader.prepareDownload(
+                        item = item,
+                        sourceId = entry.sourceId,
+                        storageIndex = entry.storageIndex,
+                    )
+                if (prepared == null) {
+                    downloadQueue.onDownloadFailedToStart(entry, error)
+                    return
+                }
+                prepared
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e)
+                downloadQueue.onDownloadFailed(entry, e)
+                return
+            }
 
         downloadQueue.onDownloadStarted(entry)
         setForeground(foregroundInfo(entry.seriesName ?: entry.name))
