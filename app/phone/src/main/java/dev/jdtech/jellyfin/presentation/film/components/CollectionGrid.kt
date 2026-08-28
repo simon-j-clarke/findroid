@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Card
@@ -23,6 +24,7 @@ fun CollectionGrid(
     sections: List<CollectionSection>,
     innerPadding: PaddingValues,
     onAction: (CollectionAction) -> Unit,
+    header: (@Composable () -> Unit)? = null,
 ) {
     LazyVerticalGrid(
         columns = GridCellsAdaptiveWithMinColumns(minSize = 160.dp, minColumns = 2),
@@ -31,6 +33,10 @@ fun CollectionGrid(
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacings.default),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacings.default),
     ) {
+        if (header != null) {
+            item(span = { GridItemSpan(maxLineSpan) }) { header() }
+        }
+
         sections.forEach { section ->
             stickyHeader {
                 Card {

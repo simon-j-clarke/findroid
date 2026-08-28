@@ -1,8 +1,6 @@
 package dev.jdtech.jellyfin.presentation.film
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
@@ -126,19 +124,18 @@ private fun DownloadsScreenLayout(
             }
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            DownloadQueueList(
-                items = queueState.items,
-                innerPadding = innerPadding,
-                onAction = onQueueAction,
-                onItemClick = onQueuedItemClick,
-            )
-            CollectionGrid(
-                sections = state.sections,
-                innerPadding = if (queueState.items.isEmpty()) innerPadding else PaddingValues(),
-                onAction = onAction,
-            )
-        }
+        CollectionGrid(
+            sections = state.sections,
+            innerPadding = innerPadding,
+            onAction = onAction,
+            header = {
+                DownloadQueueList(
+                    items = queueState.items,
+                    onAction = onQueueAction,
+                    onItemClick = onQueuedItemClick,
+                )
+            },
+        )
     }
 }
 

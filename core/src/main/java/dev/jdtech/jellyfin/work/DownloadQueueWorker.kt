@@ -81,7 +81,9 @@ constructor(
 
         try {
             var lastUpdate = 0L
-            mediaDownloader.download(prepared.url, File(prepared.path)) { downloaded, total ->
+            mediaDownloader.download(prepared.url, File(prepared.path), prepared.resumable) {
+                downloaded,
+                total ->
                 val now = System.currentTimeMillis()
                 if (now - lastUpdate >= PROGRESS_INTERVAL) {
                     lastUpdate = now
@@ -94,7 +96,7 @@ constructor(
             throw e
         } catch (e: Exception) {
             Timber.e(e)
-            downloadQueue.onDownloadFailed(entry, e)
+            downloadQueue.onDownloadFailed(entry, e, retryable = prepared.resumable)
         }
     }
 

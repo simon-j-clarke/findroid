@@ -60,6 +60,7 @@ constructor(
                         itemId = item.id,
                         sourceId = sourceId,
                         name = item.name,
+                        seriesId = (item as? FindroidEpisode)?.seriesId,
                         seriesName = (item as? FindroidEpisode)?.seriesName,
                         parentIndexNumber = (item as? FindroidEpisode)?.parentIndexNumber,
                         indexNumber = (item as? FindroidEpisode)?.indexNumber,
@@ -118,8 +119,14 @@ constructor(
             start()
         }
 
-    suspend fun onDownloadFailed(entry: DownloadQueueEntryDto, error: Throwable) =
-        withContext(Dispatchers.IO) { fail(entry, errorMessage(error), isRetryable(error)) }
+    suspend fun onDownloadFailed(
+        entry: DownloadQueueEntryDto,
+        error: Throwable,
+        retryable: Boolean = true,
+    ) =
+        withContext(Dispatchers.IO) {
+            fail(entry, errorMessage(error), retryable && isRetryable(error))
+        }
 
     suspend fun onDownloadFailedToStart(entry: DownloadQueueEntryDto, error: UiText?) =
         withContext(Dispatchers.IO) {

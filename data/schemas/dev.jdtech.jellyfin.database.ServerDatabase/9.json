@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 9,
-    "identityHash": "8a142f7eaa0ad61dfc3e00df34e3c03b",
+    "identityHash": "7ac9f52efb5f798a1786344afaecff11",
     "entities": [
       {
         "tableName": "servers",
@@ -815,7 +815,7 @@
       },
       {
         "tableName": "downloadqueue",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`itemId` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `name` TEXT NOT NULL, `seriesName` TEXT, `parentIndexNumber` INTEGER, `indexNumber` INTEGER, `storageIndex` INTEGER NOT NULL, `state` TEXT NOT NULL, `queuedAt` INTEGER NOT NULL, `bytesDownloaded` INTEGER NOT NULL, `bytesTotal` INTEGER NOT NULL, `attempt` INTEGER NOT NULL, `nextAttemptAt` INTEGER, `errorMessage` TEXT, PRIMARY KEY(`itemId`, `sourceId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`itemId` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `name` TEXT NOT NULL, `seriesId` TEXT, `seriesName` TEXT, `parentIndexNumber` INTEGER, `indexNumber` INTEGER, `storageIndex` INTEGER NOT NULL, `state` TEXT NOT NULL, `queuedAt` INTEGER NOT NULL, `bytesDownloaded` INTEGER NOT NULL, `bytesTotal` INTEGER NOT NULL, `attempt` INTEGER NOT NULL, `nextAttemptAt` INTEGER, `errorMessage` TEXT, PRIMARY KEY(`itemId`, `sourceId`))",
         "fields": [
           {
             "fieldPath": "itemId",
@@ -834,6 +834,11 @@
             "columnName": "name",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "seriesId",
+            "columnName": "seriesId",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "seriesName",
@@ -908,7 +913,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8a142f7eaa0ad61dfc3e00df34e3c03b')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7ac9f52efb5f798a1786344afaecff11')"
     ]
   }
 }

@@ -129,8 +129,22 @@ class DownloaderImpl(
             }
 
             startImagesDownloader(item)
+
+            // A transcode is produced as it is sent, so it has no length to resume from.
+            val maxHeight = appPreferences.getValue(appPreferences.downloadMaxHeight).toIntOrNull()
+            val transcodedUrl =
+                if (maxHeight != null && maxHeight > 0) {
+                    jellyfinRepository.getTranscodedStreamUrl(item.id, sourceId, maxHeight)
+                } else {
+                    ""
+                }
+
             return@coroutineScope Pair(
-                PreparedDownload(url = source.path, path = path.path.orEmpty()),
+                PreparedDownload(
+                    url = transcodedUrl.ifEmpty { source.path },
+                    path = path.path.orEmpty(),
+                    resumable = transcodedUrl.isEmpty(),
+                ),
                 null,
             )
         } catch (e: Exception) {

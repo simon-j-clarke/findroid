@@ -338,6 +338,28 @@ class JellyfinRepositoryImpl(
             sources
         }
 
+    override suspend fun getTranscodedStreamUrl(
+        itemId: UUID,
+        mediaSourceId: String,
+        maxHeight: Int,
+    ): String =
+        withContext(Dispatchers.IO) {
+            try {
+                jellyfinApi.videosApi.getVideoStreamByContainerUrl(
+                    itemId = itemId,
+                    container = "mp4",
+                    static = false,
+                    mediaSourceId = mediaSourceId,
+                    maxHeight = maxHeight,
+                    videoCodec = "h264",
+                    audioCodec = "aac",
+                )
+            } catch (e: Exception) {
+                Timber.e(e)
+                ""
+            }
+        }
+
     override suspend fun getStreamUrl(itemId: UUID, mediaSourceId: String): String =
         withContext(Dispatchers.IO) {
             try {

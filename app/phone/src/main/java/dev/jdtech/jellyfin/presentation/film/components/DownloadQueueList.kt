@@ -2,25 +2,21 @@ package dev.jdtech.jellyfin.presentation.film.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloadQueueAction
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloadQueueItem
 import dev.jdtech.jellyfin.presentation.theme.spacings
-import dev.jdtech.jellyfin.presentation.utils.rememberSafePadding
 import java.util.UUID
 
 @Composable
 fun DownloadQueueList(
     items: List<DownloadQueueItem>,
-    innerPadding: PaddingValues,
     onAction: (DownloadQueueAction) -> Unit,
     onItemClick: (itemId: UUID, isEpisode: Boolean) -> Unit,
 ) {
@@ -28,17 +24,8 @@ fun DownloadQueueList(
         return
     }
 
-    val safePadding = rememberSafePadding()
-
     Column(
-        modifier =
-            Modifier.fillMaxWidth()
-                .padding(
-                    start = safePadding.start + MaterialTheme.spacings.default,
-                    top = innerPadding.calculateTopPadding() + MaterialTheme.spacings.default,
-                    end = safePadding.end + MaterialTheme.spacings.default,
-                    bottom = MaterialTheme.spacings.default,
-                ),
+        modifier = Modifier.fillMaxWidth().padding(bottom = MaterialTheme.spacings.default),
         verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacings.small),
     ) {
         for (item in items) {

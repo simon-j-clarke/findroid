@@ -5,7 +5,7 @@ import dev.jdtech.jellyfin.models.FindroidSource
 import dev.jdtech.jellyfin.models.UiText
 import java.util.UUID
 
-data class PreparedDownload(val url: String, val path: String)
+data class PreparedDownload(val url: String, val path: String, val resumable: Boolean)
 
 interface Downloader {
     /**

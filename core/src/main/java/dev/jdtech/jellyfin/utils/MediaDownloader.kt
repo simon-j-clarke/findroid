@@ -24,12 +24,17 @@ class MediaDownloader @Inject constructor() {
             .callTimeout(0, TimeUnit.MILLISECONDS)
             .build()
 
-    suspend fun download(url: String, target: File, onProgress: suspend (Long, Long) -> Unit) =
+    suspend fun download(
+        url: String,
+        target: File,
+        resumable: Boolean = true,
+        onProgress: suspend (Long, Long) -> Unit,
+    ) =
         withContext(Dispatchers.IO) {
             target.parentFile?.mkdirs()
 
             // A partial file from an earlier attempt is continued instead of fetched again.
-            val alreadyDownloaded = if (target.exists()) target.length() else 0L
+            val alreadyDownloaded = if (resumable && target.exists()) target.length() else 0L
             val request =
                 Request.Builder()
                     .url(url)

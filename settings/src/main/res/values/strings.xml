@@ -29,6 +29,8 @@
     <string name="pref_player_gestures_seek_trickplay_summary">Display preview images on seek gesture</string>
     <string name="mpv_player">mpv player</string>
     <string name="download_mobile_data">Download using mobile data</string>
+    <string name="download_quality">Download quality</string>
+    <string name="download_quality_original">Original</string>
     <string name="download_roaming">Download when roaming</string>
     <string name="mpv_player_summary">Use the experimental mpv player to play videos. mpv has support for more video, audio and subtitle codecs.</string>
     <string name="gestures">Gestures</string>

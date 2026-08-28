@@ -208,6 +208,14 @@ class JellyfinRepositoryOfflineImpl(
             database.getSources(itemId).map { it.toFindroidSource(database) }
         }
 
+    override suspend fun getTranscodedStreamUrl(
+        itemId: UUID,
+        mediaSourceId: String,
+        maxHeight: Int,
+    ): String {
+        return ""
+    }
+
     override suspend fun getStreamUrl(itemId: UUID, mediaSourceId: String): String {
         TODO("Not yet implemented")
     }

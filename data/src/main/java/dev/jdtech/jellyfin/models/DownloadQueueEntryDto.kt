@@ -8,6 +8,7 @@ data class DownloadQueueEntryDto(
     val itemId: UUID,
     val sourceId: String,
     val name: String,
+    val seriesId: UUID? = null,
     val seriesName: String? = null,
     val parentIndexNumber: Int? = null,
     val indexNumber: Int? = null,

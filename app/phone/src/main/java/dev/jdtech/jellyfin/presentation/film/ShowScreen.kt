@@ -84,6 +84,8 @@ fun ShowScreen(
 
     LaunchedEffect(true) { viewModel.loadShow(showId = showId) }
 
+    LaunchedEffect(showId) { downloaderViewModel.trackSeries(showId) }
+
     ShowScreenLayout(
         state = state,
         downloaderState = downloaderState,

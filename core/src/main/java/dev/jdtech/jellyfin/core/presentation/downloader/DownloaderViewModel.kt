@@ -33,20 +33,27 @@ constructor(
     private val repository: JellyfinRepository,
 ) : ViewModel() {
     private val trackedItems = MutableStateFlow<List<FindroidItem>>(emptyList())
+    private val trackedSeriesId = MutableStateFlow<UUID?>(null)
 
     private val eventsChannel = Channel<DownloaderEvent>()
     val events = eventsChannel.receiveAsFlow()
 
     val state: StateFlow<DownloaderState> =
-        combine(trackedItems, downloadQueue.getQueue(), progressTicker()) { items, queue, _ ->
-                toState(queue.filter { entry -> items.any { it.id == entry.itemId } })
+        combine(
+                trackedItems,
+                trackedSeriesId,
+                downloadQueue.getQueue(),
+                progressTicker(),
+            ) { items, seriesId, queue, _ ->
+                toState(queue.filter { entry -> entry.isTracked(items, seriesId) })
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), DownloaderState())
 
     init {
         viewModelScope.launch {
-            combine(trackedItems, downloadQueue.getQueue()) { items, queue ->
-                    queue.count { entry -> items.any { it.id == entry.itemId } }
+            combine(trackedItems, trackedSeriesId, downloadQueue.getQueue()) { items, seriesId, queue
+                    ->
+                    queue.count { entry -> entry.isTracked(items, seriesId) }
                 }
                 .distinctUntilChanged()
                 .drop(1)
@@ -60,6 +67,17 @@ constructor(
 
     fun track(items: List<FindroidItem>) {
         trackedItems.value = items
+    }
+
+    fun trackSeries(seriesId: UUID) {
+        trackedSeriesId.value = seriesId
+    }
+
+    private fun DownloadQueueEntryDto.isTracked(
+        items: List<FindroidItem>,
+        seriesId: UUID?,
+    ): Boolean {
+        return items.any { it.id == itemId } || (seriesId != null && this.seriesId == seriesId)
     }
 
     fun onAction(action: DownloaderAction) {

@@ -626,6 +626,15 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                                     PreferenceGroup(
                                         preferences =
                                             listOf(
+                                                PreferenceSelect(
+                                                    nameStringResource =
+                                                        R.string.download_quality,
+                                                    supportedDeviceTypes = listOf(DeviceType.PHONE),
+                                                    backendPreference =
+                                                        appPreferences.downloadMaxHeight,
+                                                    options = R.array.download_qualities,
+                                                    optionValues = R.array.download_qualities_values,
+                                                ),
                                                 PreferenceSwitch(
                                                     nameStringResource =
                                                         R.string.download_mobile_data,
