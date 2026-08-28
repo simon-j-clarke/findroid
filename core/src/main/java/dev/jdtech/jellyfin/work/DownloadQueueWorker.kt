@@ -52,6 +52,12 @@ constructor(
                 download(entry)
             }
 
+            // Nothing is due right now, but entries that are waiting on a retry, or that were
+            // left behind by a run that ended early, have nothing else to start them.
+            if (database.getDownloadQueueSizeSync() > 0) {
+                downloadQueue.start(RECHECK_DELAY)
+            }
+
             Result.success()
         }
 
@@ -135,5 +141,6 @@ constructor(
         const val CHANNEL_ID = "downloads"
         const val NOTIFICATION_ID = 1
         const val PROGRESS_INTERVAL = 1000L
+        const val RECHECK_DELAY = 15 * 60 * 1000L
     }
 }

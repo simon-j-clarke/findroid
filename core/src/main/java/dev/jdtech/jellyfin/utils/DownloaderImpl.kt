@@ -37,6 +37,7 @@ import java.util.UUID
 import kotlin.Exception
 import kotlin.math.ceil
 import kotlinx.coroutines.coroutineScope
+import org.jellyfin.sdk.model.api.MediaStreamType
 import timber.log.Timber
 
 class DownloaderImpl(
@@ -130,10 +131,17 @@ class DownloaderImpl(
 
             startImagesDownloader(item)
 
-            // A transcode is produced as it is sent, so it has no length to resume from.
+            // Transcoding a source that already fits costs the server an encode and gains
+            // nothing, and a transcode is produced as it is sent so it has no length to resume
+            // from.
             val maxHeight = appPreferences.getValue(appPreferences.downloadMaxHeight).toIntOrNull()
+            val sourceHeight =
+                source.mediaStreams
+                    .filter { it.type == MediaStreamType.VIDEO }
+                    .mapNotNull { it.height }
+                    .maxOrNull()
             val transcodedUrl =
-                if (maxHeight != null && maxHeight > 0) {
+                if (maxHeight != null && maxHeight > 0 && (sourceHeight ?: 0) > maxHeight) {
                     jellyfinRepository.getTranscodedStreamUrl(item.id, sourceId, maxHeight)
                 } else {
                     ""

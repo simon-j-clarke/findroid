@@ -271,6 +271,8 @@ interface ServerDatabaseDao {
 
     @Query("SELECT COUNT(*) FROM downloadqueue") fun getDownloadQueueSize(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM downloadqueue") fun getDownloadQueueSizeSync(): Int
+
     @Query(
         "SELECT COUNT(*) FROM episodes JOIN sources ON sources.itemId = episodes.id WHERE episodes.seriesId = :seriesId AND sources.path NOT LIKE '%.download'"
     )
