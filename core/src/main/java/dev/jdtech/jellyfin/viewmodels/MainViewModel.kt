@@ -9,11 +9,7 @@ import dev.jdtech.jellyfin.models.User
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -26,12 +22,6 @@ constructor(private val appPreferences: AppPreferences, private val database: Se
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState = _uiState.asStateFlow()
-
-    val hasDownloadsInProgress: StateFlow<Boolean> =
-        database
-            .getDownloadQueueSize()
-            .map { size -> size > 0 }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), false)
 
     sealed class UiState {
         data class Normal(val server: Server?, val user: User?) : UiState()

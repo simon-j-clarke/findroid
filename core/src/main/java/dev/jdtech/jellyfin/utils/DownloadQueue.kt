@@ -1,6 +1,5 @@
 package dev.jdtech.jellyfin.utils
 
-import android.app.DownloadManager
 import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
@@ -12,11 +11,13 @@ import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
 import dev.jdtech.jellyfin.models.DownloadState
+import dev.jdtech.jellyfin.models.FindroidEpisode
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.UiText
 import dev.jdtech.jellyfin.models.isDownloaded
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.work.DownloadQueueWorker
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -59,6 +60,9 @@ constructor(
                         itemId = item.id,
                         sourceId = sourceId,
                         name = item.name,
+                        seriesName = (item as? FindroidEpisode)?.seriesName,
+                        parentIndexNumber = (item as? FindroidEpisode)?.parentIndexNumber,
+                        indexNumber = (item as? FindroidEpisode)?.indexNumber,
                         storageIndex = storageIndex,
                         state = DownloadState.QUEUED,
                         queuedAt = queuedAt,
@@ -68,25 +72,13 @@ constructor(
             start()
         }
 
-    suspend fun cancel(item: FindroidItem) =
-        withContext(Dispatchers.IO) {
-            val entry = database.getDownloadQueueEntry(item.id)
-            database.deleteDownloadQueueEntries(item.id)
-            entry?.downloadId?.let { downloadId ->
-                downloader.cancelDownload(item = item, downloadId = downloadId)
-            }
-            start()
-        }
+    suspend fun cancel(item: FindroidItem) = cancel(item.id)
 
     suspend fun cancel(itemId: UUID) =
         withContext(Dispatchers.IO) {
-            val item = downloader.getDownloadedItem(itemId)
-            if (item != null) {
-                cancel(item)
-            } else {
-                database.deleteDownloadQueueEntries(itemId)
-                start()
-            }
+            database.deleteDownloadQueueEntries(itemId)
+            downloader.deleteDownload(itemId)
+            start()
         }
 
     suspend fun retry(itemId: UUID) =
@@ -103,30 +95,35 @@ constructor(
         }
 
     suspend fun clearFailed() =
-        withContext(Dispatchers.IO) { database.deleteFailedDownloadQueueEntries() }
-
-    suspend fun onDownloadStarted(entry: DownloadQueueEntryDto, downloadId: Long) =
         withContext(Dispatchers.IO) {
-            database.updateDownloadQueueEntry(
-                entry.copy(state = DownloadState.RUNNING, downloadId = downloadId)
-            )
-        }
-
-    suspend fun onDownloadFinished(downloadId: Long, status: Int, reason: Int) =
-        withContext(Dispatchers.IO) {
-            val entry = database.getDownloadQueueEntryByDownloadId(downloadId) ?: return@withContext
-            if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                database.deleteDownloadQueueEntries(entry.itemId)
-                start()
-            } else {
-                fail(entry, errorMessage(reason), isRetryable(reason))
+            for (entry in database.getDownloadQueueEntriesByState(DownloadState.FAILED)) {
+                downloader.deleteDownload(entry.itemId)
             }
+            database.deleteFailedDownloadQueueEntries()
         }
+
+    suspend fun onDownloadStarted(entry: DownloadQueueEntryDto) =
+        withContext(Dispatchers.IO) {
+            database.updateDownloadQueueEntry(entry.copy(state = DownloadState.RUNNING))
+        }
+
+    suspend fun onProgress(itemId: UUID, bytesDownloaded: Long, bytesTotal: Long) =
+        withContext(Dispatchers.IO) {
+            database.setDownloadQueueProgress(itemId, bytesDownloaded, bytesTotal)
+        }
+
+    suspend fun onDownloadFinished(entry: DownloadQueueEntryDto) =
+        withContext(Dispatchers.IO) {
+            database.deleteDownloadQueueEntries(entry.itemId)
+            start()
+        }
+
+    suspend fun onDownloadFailed(entry: DownloadQueueEntryDto, error: Throwable) =
+        withContext(Dispatchers.IO) { fail(entry, errorMessage(error), isRetryable(error)) }
 
     suspend fun onDownloadFailedToStart(entry: DownloadQueueEntryDto, error: UiText?) =
         withContext(Dispatchers.IO) {
-            val message = error?.asString(context.resources)
-            fail(entry, message, isRetryableError(error))
+            fail(entry, error?.asString(context.resources), isRetryableError(error))
         }
 
     fun start(delayMillis: Long = 0) {
@@ -156,7 +153,6 @@ constructor(
         database.updateDownloadQueueEntry(
             entry.copy(
                 state = DownloadState.FAILED,
-                downloadId = null,
                 attempt = attempt,
                 nextAttemptAt = retryDelay?.let { System.currentTimeMillis() + it },
                 errorMessage = message,
@@ -171,43 +167,33 @@ constructor(
             attempt = 0,
             nextAttemptAt = null,
             errorMessage = null,
-            downloadId = null,
         )
     }
 
-    private fun isRetryable(reason: Int): Boolean {
-        return reason in RETRYABLE_REASONS || reason in 500..599
+    // A server that is unreachable or having trouble is worth another attempt, one that rejects
+    // the request is not.
+    private fun isRetryable(error: Throwable): Boolean {
+        val code = (error as? HttpStatusException)?.code ?: return error is IOException
+        return code >= 500
     }
 
-    // Failing to start is retryable unless the storage itself is the problem.
     private fun isRetryableError(error: UiText?): Boolean {
         val resId = (error as? UiText.StringResource)?.resId
         return resId != CoreR.string.not_enough_storage && resId != CoreR.string.storage_unavailable
     }
 
-    private fun errorMessage(reason: Int): String {
-        val resId =
-            when (reason) {
-                DownloadManager.ERROR_INSUFFICIENT_SPACE -> CoreR.string.download_error_storage
-                DownloadManager.ERROR_DEVICE_NOT_FOUND -> CoreR.string.storage_unavailable
-                in RETRYABLE_REASONS -> CoreR.string.download_error_network
-                else -> CoreR.string.unknown_error
-            }
-        return context.getString(resId)
+    private fun errorMessage(error: Throwable): String {
+        return when {
+            error is HttpStatusException -> context.getString(CoreR.string.download_error_server)
+            error is IOException -> context.getString(CoreR.string.download_error_network)
+            error.message != null -> error.message!!
+            else -> context.getString(CoreR.string.unknown_error)
+        }
     }
 
     companion object {
         const val WORK_NAME = "downloadQueue"
 
         private val RETRY_DELAYS = listOf(30_000L, 120_000L, 480_000L)
-
-        private val RETRYABLE_REASONS =
-            listOf(
-                DownloadManager.ERROR_UNKNOWN,
-                DownloadManager.ERROR_HTTP_DATA_ERROR,
-                DownloadManager.ERROR_TOO_MANY_REDIRECTS,
-                DownloadManager.ERROR_UNHANDLED_HTTP_CODE,
-                DownloadManager.ERROR_CANNOT_RESUME,
-            )
     }
 }

@@ -5,20 +5,25 @@ import dev.jdtech.jellyfin.models.FindroidSource
 import dev.jdtech.jellyfin.models.UiText
 import java.util.UUID
 
+data class PreparedDownload(val url: String, val path: String)
+
 interface Downloader {
-    suspend fun downloadItem(
+    /**
+     * Stores everything belonging to the item and returns where its media file has to be downloaded
+     * from and to.
+     */
+    suspend fun prepareDownload(
         item: FindroidItem,
         sourceId: String,
         storageIndex: Int = 0,
-    ): Pair<Long, UiText?>
+    ): Pair<PreparedDownload?, UiText?>
 
-    suspend fun cancelDownload(item: FindroidItem, downloadId: Long)
+    /** Turns the partial file of a finished download into the file the item plays from. */
+    suspend fun completeDownload(sourceId: String, path: String): Boolean
 
     suspend fun deleteItem(item: FindroidItem, source: FindroidSource)
 
-    suspend fun getProgress(downloadId: Long?): Pair<Int, Int>
-
-    suspend fun getDownloadStatus(downloadId: Long): Pair<Int, Int>
+    suspend fun deleteDownload(itemId: UUID)
 
     suspend fun getDownloadedItem(itemId: UUID): FindroidItem?
 }

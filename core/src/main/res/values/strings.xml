@@ -107,6 +107,7 @@
     <string name="manage_servers">Manage servers</string>
     <string name="download_pending">Pending…</string>
     <string name="download_paused">Paused</string>
+    <string name="download_paused_retry">Waiting to retry</string>
     <string name="download_downloading">Downloading…</string>
     <string name="download_failed">Failed to download</string>
     <string name="title_downloading">Downloading</string>
@@ -114,4 +115,5 @@
     <string name="download_clear_failed">Clear failed downloads</string>
     <string name="download_error_storage">Not enough storage space</string>
     <string name="download_error_network">Network error</string>
+    <string name="download_error_server">Server error</string>
 </resources>

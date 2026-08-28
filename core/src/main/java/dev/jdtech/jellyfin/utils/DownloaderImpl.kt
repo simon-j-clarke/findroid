@@ -1,12 +1,10 @@
 package dev.jdtech.jellyfin.utils
 
-import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.os.StatFs
 import android.text.format.Formatter
-import androidx.core.net.toUri
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
@@ -47,17 +45,14 @@ class DownloaderImpl(
     private val jellyfinRepository: JellyfinRepository,
     private val appPreferences: AppPreferences,
     private val workManager: WorkManager,
+    private val mediaDownloader: MediaDownloader,
 ) : Downloader {
-    private val downloadManager = context.getSystemService(DownloadManager::class.java)
 
-    // TODO: We should probably move most (if not all) code to a worker.
-    //  At this moment it is possible that some things are not downloaded due to the user leaving
-    //  the current screen
-    override suspend fun downloadItem(
+    override suspend fun prepareDownload(
         item: FindroidItem,
         sourceId: String,
         storageIndex: Int,
-    ): Pair<Long, UiText?> = coroutineScope {
+    ): Pair<PreparedDownload?, UiText?> = coroutineScope {
         try {
             val source =
                 jellyfinRepository.getMediaSources(item.id, true).first { it.id == sourceId }
@@ -75,7 +70,7 @@ class DownloaderImpl(
                         Environment.MEDIA_MOUNTED
             ) {
                 return@coroutineScope Pair(
-                    -1,
+                    null,
                     UiText.StringResource(CoreR.string.storage_unavailable),
                 )
             }
@@ -84,7 +79,7 @@ class DownloaderImpl(
             val stats = StatFs(storageLocation.path)
             if (stats.availableBytes < source.size) {
                 return@coroutineScope Pair(
-                    -1,
+                    null,
                     UiText.StringResource(
                         CoreR.string.not_enough_storage,
                         Formatter.formatFileSize(context, source.size),
@@ -92,21 +87,6 @@ class DownloaderImpl(
                     ),
                 )
             }
-            val request =
-                DownloadManager.Request(source.path.toUri())
-                    .setTitle(item.name)
-                    .setAllowedOverMetered(
-                        appPreferences.getValue(appPreferences.downloadOverMobileData)
-                    )
-                    .setAllowedOverRoaming(
-                        appPreferences.getValue(appPreferences.downloadWhenRoaming)
-                    )
-                    .setNotificationVisibility(
-                        DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-                    )
-                    .setDestinationUri(path)
-            val downloadId = downloadManager.enqueue(request)
-
             when (item) {
                 is FindroidMovie -> {
                     database.insertMovie(
@@ -137,7 +117,7 @@ class DownloaderImpl(
 
             val sourceDto = source.toFindroidSourceDto(item.id, path.path.orEmpty())
 
-            database.insertSource(sourceDto.copy(downloadId = downloadId))
+            database.insertSource(sourceDto)
             database.insertUserData(item.toFindroidUserDataDto(jellyfinRepository.getUserId()))
 
             downloadExternalMediaStreams(item, source, storageIndex)
@@ -149,7 +129,10 @@ class DownloaderImpl(
             }
 
             startImagesDownloader(item)
-            return@coroutineScope Pair(downloadId, null)
+            return@coroutineScope Pair(
+                PreparedDownload(url = source.path, path = path.path.orEmpty()),
+                null,
+            )
         } catch (e: Exception) {
             try {
                 val source = jellyfinRepository.getMediaSources(item.id).first { it.id == sourceId }
@@ -157,20 +140,33 @@ class DownloaderImpl(
             } catch (_: Exception) {}
             Timber.e(e)
             return@coroutineScope Pair(
-                -1,
+                null,
                 if (e.message != null) UiText.DynamicString(e.message!!)
                 else UiText.StringResource(CoreR.string.unknown_error),
             )
         }
     }
 
-    override suspend fun cancelDownload(item: FindroidItem, downloadId: Long) {
-        val source =
-            database.getSourceByDownloadId(downloadId)?.toFindroidSource(database) ?: return
-        if (source.downloadId != null) {
-            downloadManager.remove(source.downloadId!!)
+    override suspend fun completeDownload(sourceId: String, path: String): Boolean {
+        val finalPath = path.replace(".download", "")
+        if (!File(path).renameTo(File(finalPath))) {
+            return false
         }
-        deleteItem(item, source)
+        database.setSourcePath(sourceId, finalPath)
+        return true
+    }
+
+    override suspend fun deleteDownload(itemId: UUID) {
+        val item = getDownloadedItem(itemId)
+        for (sourceDto in database.getSources(itemId)) {
+            val source = sourceDto.toFindroidSource(database)
+            if (item != null) {
+                deleteItem(item, source)
+            } else {
+                File(source.path).delete()
+                database.deleteSource(source.id)
+            }
+        }
     }
 
     override suspend fun deleteItem(item: FindroidItem, source: FindroidSource) {
@@ -212,58 +208,6 @@ class DownloaderImpl(
         File(context.filesDir, "images/${item.id}").deleteRecursively()
     }
 
-    override suspend fun getProgress(downloadId: Long?): Pair<Int, Int> {
-        var downloadStatus = -1
-        var progress = -1
-        if (downloadId == null) {
-            return Pair(downloadStatus, progress)
-        }
-        val query = DownloadManager.Query().setFilterById(downloadId)
-        downloadManager.query(query).use { cursor ->
-            if (cursor.moveToFirst()) {
-                downloadStatus =
-                    cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                when (downloadStatus) {
-                    DownloadManager.STATUS_RUNNING -> {
-                        val totalBytes =
-                            cursor.getLong(
-                                cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                            )
-                        if (totalBytes > 0) {
-                            val downloadedBytes =
-                                cursor.getLong(
-                                    cursor.getColumnIndexOrThrow(
-                                        DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR
-                                    )
-                                )
-                            progress = downloadedBytes.times(100).div(totalBytes).toInt()
-                        }
-                    }
-
-                    DownloadManager.STATUS_SUCCESSFUL -> {
-                        progress = 100
-                    }
-                }
-            } else {
-                downloadStatus = DownloadManager.STATUS_FAILED
-            }
-        }
-        return Pair(downloadStatus, progress)
-    }
-
-    override suspend fun getDownloadStatus(downloadId: Long): Pair<Int, Int> {
-        val query = DownloadManager.Query().setFilterById(downloadId)
-        downloadManager.query(query).use { cursor ->
-            if (!cursor.moveToFirst()) {
-                return Pair(DownloadManager.STATUS_FAILED, DownloadManager.ERROR_UNKNOWN)
-            }
-            val downloadStatus =
-                cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-            val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
-            return Pair(downloadStatus, reason)
-        }
-    }
-
     override suspend fun getDownloadedItem(itemId: UUID): FindroidItem? {
         val userId = jellyfinRepository.getUserId()
         val movie = database.getMovies().firstOrNull { it.id == itemId }
@@ -275,7 +219,7 @@ class DownloaderImpl(
             ?.toFindroidEpisode(database, userId)
     }
 
-    private fun downloadExternalMediaStreams(
+    private suspend fun downloadExternalMediaStreams(
         item: FindroidItem,
         source: FindroidSource,
         storageIndex: Int = 0,
@@ -283,26 +227,17 @@ class DownloaderImpl(
         val storageLocation = context.getExternalFilesDirs(null)[storageIndex]
         for (mediaStream in source.mediaStreams.filter { it.isExternal }) {
             val id = UUID.randomUUID()
-            val streamPath =
-                Uri.fromFile(
-                    File(storageLocation, "downloads/${item.id}.${source.id}.$id.download")
-                )
+            val streamPath = File(storageLocation, "downloads/${item.id}.${source.id}.$id")
             database.insertMediaStream(
-                mediaStream.toFindroidMediaStreamDto(id, source.id, streamPath.path.orEmpty())
+                mediaStream.toFindroidMediaStreamDto(id, source.id, streamPath.path)
             )
-            val request =
-                DownloadManager.Request(mediaStream.path!!.toUri())
-                    .setTitle(mediaStream.title)
-                    .setAllowedOverMetered(
-                        appPreferences.getValue(appPreferences.downloadOverMobileData)
-                    )
-                    .setAllowedOverRoaming(
-                        appPreferences.getValue(appPreferences.downloadWhenRoaming)
-                    )
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
-                    .setDestinationUri(streamPath)
-            val downloadId = downloadManager.enqueue(request)
-            database.setMediaStreamDownloadId(id, downloadId)
+            try {
+                mediaDownloader.download(mediaStream.path!!, streamPath) { _, _ -> }
+            } catch (e: Exception) {
+                Timber.e(e)
+                streamPath.delete()
+                database.deleteMediaStream(id)
+            }
         }
     }
 

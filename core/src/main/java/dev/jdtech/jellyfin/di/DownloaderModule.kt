@@ -11,6 +11,7 @@ import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import dev.jdtech.jellyfin.utils.Downloader
 import dev.jdtech.jellyfin.utils.DownloaderImpl
+import dev.jdtech.jellyfin.utils.MediaDownloader
 import javax.inject.Singleton
 
 @Module
@@ -24,6 +25,7 @@ object DownloaderModule {
         jellyfinRepository: JellyfinRepository,
         appPreferences: AppPreferences,
         workManager: WorkManager,
+        mediaDownloader: MediaDownloader,
     ): Downloader {
         return DownloaderImpl(
             application,
@@ -31,6 +33,7 @@ object DownloaderModule {
             jellyfinRepository,
             appPreferences,
             workManager,
+            mediaDownloader,
         )
     }
 }

@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
 import dev.jdtech.jellyfin.utils.DownloadQueue
-import dev.jdtech.jellyfin.utils.Downloader
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,8 +16,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class DownloadQueueViewModel
 @Inject
-constructor(private val downloader: Downloader, private val downloadQueue: DownloadQueue) :
-    ViewModel() {
+constructor(private val downloadQueue: DownloadQueue) : ViewModel() {
     val state: StateFlow<DownloadQueueState> =
         combine(downloadQueue.getQueue(), progressTicker()) { queue, _ ->
                 DownloadQueueState(items = queue.map { entry -> entry.toItem() })
@@ -50,11 +48,14 @@ constructor(private val downloader: Downloader, private val downloadQueue: Downl
         viewModelScope.launch { downloadQueue.clearFailed() }
     }
 
-    private suspend fun DownloadQueueEntryDto.toItem(): DownloadQueueItem {
+    private fun DownloadQueueEntryDto.toItem(): DownloadQueueItem {
         return DownloadQueueItem(
             itemId = itemId,
             name = name,
-            downloaderState = toDownloaderState(downloader),
+            seriesName = seriesName,
+            parentIndexNumber = parentIndexNumber,
+            indexNumber = indexNumber,
+            downloaderState = toDownloaderState(),
         )
     }
 }

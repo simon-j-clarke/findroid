@@ -277,8 +277,10 @@ interface ServerDatabaseDao {
     @Query("SELECT * FROM downloadqueue WHERE itemId = :itemId LIMIT 1")
     fun getDownloadQueueEntry(itemId: UUID): DownloadQueueEntryDto?
 
-    @Query("SELECT * FROM downloadqueue WHERE downloadId = :downloadId")
-    fun getDownloadQueueEntryByDownloadId(downloadId: Long): DownloadQueueEntryDto?
+    @Query(
+        "UPDATE downloadqueue SET bytesDownloaded = :bytesDownloaded, bytesTotal = :bytesTotal WHERE itemId = :itemId"
+    )
+    fun setDownloadQueueProgress(itemId: UUID, bytesDownloaded: Long, bytesTotal: Long)
 
     @Query(
         "SELECT * FROM downloadqueue WHERE state = 'QUEUED' OR (state = 'FAILED' AND nextAttemptAt IS NOT NULL AND nextAttemptAt <= :now) ORDER BY queuedAt ASC LIMIT 1"
@@ -297,7 +299,7 @@ interface ServerDatabaseDao {
     fun deleteFailedDownloadQueueEntries()
 
     @Query(
-        "UPDATE downloadqueue SET state = 'QUEUED', attempt = 0, nextAttemptAt = NULL, errorMessage = NULL WHERE state = 'FAILED'"
+        "UPDATE downloadqueue SET state = 'QUEUED', attempt = 0, nextAttemptAt = NULL, errorMessage = NULL, bytesDownloaded = 0, bytesTotal = 0 WHERE state = 'FAILED'"
     )
     fun retryFailedDownloadQueueEntries()
 }

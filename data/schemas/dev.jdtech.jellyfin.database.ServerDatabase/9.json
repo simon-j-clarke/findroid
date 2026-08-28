@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 9,
-    "identityHash": "6d63056756366664697f54cabd2baca6",
+    "identityHash": "8a142f7eaa0ad61dfc3e00df34e3c03b",
     "entities": [
       {
         "tableName": "servers",
@@ -815,7 +815,7 @@
       },
       {
         "tableName": "downloadqueue",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`itemId` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `name` TEXT NOT NULL, `storageIndex` INTEGER NOT NULL, `state` TEXT NOT NULL, `queuedAt` INTEGER NOT NULL, `downloadId` INTEGER, `attempt` INTEGER NOT NULL, `nextAttemptAt` INTEGER, `errorMessage` TEXT, PRIMARY KEY(`itemId`, `sourceId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`itemId` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `name` TEXT NOT NULL, `seriesName` TEXT, `parentIndexNumber` INTEGER, `indexNumber` INTEGER, `storageIndex` INTEGER NOT NULL, `state` TEXT NOT NULL, `queuedAt` INTEGER NOT NULL, `bytesDownloaded` INTEGER NOT NULL, `bytesTotal` INTEGER NOT NULL, `attempt` INTEGER NOT NULL, `nextAttemptAt` INTEGER, `errorMessage` TEXT, PRIMARY KEY(`itemId`, `sourceId`))",
         "fields": [
           {
             "fieldPath": "itemId",
@@ -836,6 +836,21 @@
             "notNull": true
           },
           {
+            "fieldPath": "seriesName",
+            "columnName": "seriesName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "parentIndexNumber",
+            "columnName": "parentIndexNumber",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "indexNumber",
+            "columnName": "indexNumber",
+            "affinity": "INTEGER"
+          },
+          {
             "fieldPath": "storageIndex",
             "columnName": "storageIndex",
             "affinity": "INTEGER",
@@ -854,9 +869,16 @@
             "notNull": true
           },
           {
-            "fieldPath": "downloadId",
-            "columnName": "downloadId",
-            "affinity": "INTEGER"
+            "fieldPath": "bytesDownloaded",
+            "columnName": "bytesDownloaded",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bytesTotal",
+            "columnName": "bytesTotal",
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "attempt",
@@ -886,7 +908,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6d63056756366664697f54cabd2baca6')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8a142f7eaa0ad61dfc3e00df34e3c03b')"
     ]
   }
 }

@@ -1,19 +1,16 @@
 package dev.jdtech.jellyfin.core.presentation.downloader
 
-import android.app.DownloadManager
+import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.UiText
 
 data class DownloaderState(
-    val status: Int = 0,
+    val state: DownloadState? = null,
     val progress: Float = 0f,
+    val bytesDownloaded: Long = 0,
+    val bytesTotal: Long = 0,
+    val willRetry: Boolean = false,
     val errorText: UiText? = null,
 ) {
     val isDownloading: Boolean
-        get() =
-            status in
-                arrayOf(
-                    DownloadManager.STATUS_PENDING,
-                    DownloadManager.STATUS_RUNNING,
-                    DownloadManager.STATUS_FAILED,
-                )
+        get() = state != null
 }

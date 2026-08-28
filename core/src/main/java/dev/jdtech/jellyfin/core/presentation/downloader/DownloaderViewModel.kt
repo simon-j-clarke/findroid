@@ -4,12 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
-import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.FindroidSourceType
 import dev.jdtech.jellyfin.models.isDownloaded
+import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.utils.DownloadQueue
 import dev.jdtech.jellyfin.utils.Downloader
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,12 +22,16 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.jellyfin.sdk.model.api.ItemFields
 
 @HiltViewModel
 class DownloaderViewModel
 @Inject
-constructor(private val downloader: Downloader, private val downloadQueue: DownloadQueue) :
-    ViewModel() {
+constructor(
+    private val downloader: Downloader,
+    private val downloadQueue: DownloadQueue,
+    private val repository: JellyfinRepository,
+) : ViewModel() {
     private val trackedItems = MutableStateFlow<List<FindroidItem>>(emptyList())
 
     private val eventsChannel = Channel<DownloaderEvent>()
@@ -60,6 +65,7 @@ constructor(private val downloader: Downloader, private val downloadQueue: Downl
     fun onAction(action: DownloaderAction) {
         when (action) {
             is DownloaderAction.Download -> download(action.items, action.storageIndex)
+            is DownloaderAction.DownloadShow -> downloadShow(action.seriesId, action.storageIndex)
             is DownloaderAction.CancelDownload -> cancelDownload(action.items)
             is DownloaderAction.DeleteDownload -> deleteDownload(action.items)
         }
@@ -67,6 +73,20 @@ constructor(private val downloader: Downloader, private val downloadQueue: Downl
 
     private fun download(items: List<FindroidItem>, storageIndex: Int) {
         viewModelScope.launch { downloadQueue.enqueue(items, storageIndex) }
+    }
+
+    private fun downloadShow(seriesId: UUID, storageIndex: Int) {
+        viewModelScope.launch {
+            val episodes =
+                repository.getSeasons(seriesId).flatMap { season ->
+                    repository.getEpisodes(
+                        seriesId = seriesId,
+                        seasonId = season.id,
+                        fields = listOf(ItemFields.CAN_DOWNLOAD, ItemFields.MEDIA_SOURCES),
+                    )
+                }
+            downloadQueue.enqueue(episodes.filter { it.canDownload }, storageIndex)
+        }
     }
 
     private fun cancelDownload(items: List<FindroidItem>) {
@@ -90,12 +110,5 @@ constructor(private val downloader: Downloader, private val downloadQueue: Downl
         }
     }
 
-    private suspend fun toState(entries: List<DownloadQueueEntryDto>): DownloaderState {
-        val entry =
-            entries.firstOrNull { it.state == DownloadState.RUNNING }
-                ?: entries.firstOrNull { it.state == DownloadState.QUEUED }
-                ?: entries.firstOrNull { it.state == DownloadState.FAILED }
-                ?: return DownloaderState()
-        return entry.toDownloaderState(downloader)
-    }
+    private fun toState(entries: List<DownloadQueueEntryDto>) = entries.toDownloaderState()
 }

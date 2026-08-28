@@ -43,6 +43,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.core.presentation.dummy.dummyShow
+import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderAction
+import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
+import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderViewModel
 import dev.jdtech.jellyfin.film.presentation.show.ShowAction
 import dev.jdtech.jellyfin.film.presentation.show.ShowState
 import dev.jdtech.jellyfin.film.presentation.show.ShowViewModel
@@ -71,16 +74,20 @@ fun ShowScreen(
     navigateToItem: (item: FindroidItem) -> Unit,
     navigateToPerson: (personId: UUID) -> Unit,
     viewModel: ShowViewModel = hiltViewModel(),
+    downloaderViewModel: DownloaderViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
 
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val downloaderState by downloaderViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(true) { viewModel.loadShow(showId = showId) }
 
     ShowScreenLayout(
         state = state,
+        downloaderState = downloaderState,
+        onDownloaderAction = { action -> downloaderViewModel.onAction(action) },
         onAction = { action ->
             when (action) {
                 is ShowAction.Play -> {
@@ -108,7 +115,12 @@ fun ShowScreen(
 }
 
 @Composable
-private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
+private fun ShowScreenLayout(
+    state: ShowState,
+    downloaderState: DownloaderState,
+    onAction: (ShowAction) -> Unit,
+    onDownloaderAction: (DownloaderAction) -> Unit,
+) {
     val safePadding = rememberSafePadding()
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
@@ -188,6 +200,8 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
                     Spacer(Modifier.height(MaterialTheme.spacings.small))
                     ItemButtonsBar(
                         item = show,
+                        downloaderState = downloaderState,
+                        canDownload = state.seasons.isNotEmpty(),
                         onPlayClick = { startFromBeginning ->
                             onAction(ShowAction.Play(startFromBeginning = startFromBeginning))
                         },
@@ -204,7 +218,11 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
                             }
                         },
                         onTrailerClick = { uri -> onAction(ShowAction.PlayTrailer(uri)) },
-                        onDownloadClick = {},
+                        onDownloadClick = { storageIndex ->
+                            onDownloaderAction(
+                                DownloaderAction.DownloadShow(show.id, storageIndex)
+                            )
+                        },
                         onDownloadCancelClick = {},
                         onDownloadDeleteClick = {},
                         modifier = Modifier.fillMaxWidth(),
@@ -300,5 +318,12 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
 @PreviewScreenSizes
 @Composable
 private fun EpisodeScreenLayoutPreview() {
-    FindroidTheme { ShowScreenLayout(state = ShowState(show = dummyShow), onAction = {}) }
+    FindroidTheme {
+        ShowScreenLayout(
+            state = ShowState(show = dummyShow),
+            downloaderState = DownloaderState(),
+            onAction = {},
+            onDownloaderAction = {},
+        )
+    }
 }
