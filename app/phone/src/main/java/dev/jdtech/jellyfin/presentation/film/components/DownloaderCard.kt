@@ -143,6 +143,15 @@ fun DownloaderCard(
                 // A server that reports no size leaves the download manager without a total, so
                 // there is no percentage to show.
                 when {
+                    // A queued item is not doing anything yet, so its bar does not animate.
+                    state.state == DownloadState.QUEUED -> {
+                        LinearProgressIndicator(
+                            progress = { 0f },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = progressIndicatorColor,
+                            trackColor = progressTrackColor,
+                        )
+                    }
                     state.itemsTotal > 1 -> {
                         LinearProgressIndicator(
                             progress = {
@@ -154,7 +163,7 @@ fun DownloaderCard(
                             trackColor = progressTrackColor,
                         )
                     }
-                    state.state == DownloadState.QUEUED || state.bytesTotal == 0L -> {
+                    state.bytesTotal == 0L -> {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                     else -> {

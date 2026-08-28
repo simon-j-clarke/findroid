@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.models.DownloadQueueEntryDto
+import dev.jdtech.jellyfin.models.DownloadState
 import dev.jdtech.jellyfin.utils.DownloadQueue
 import java.util.UUID
 import javax.inject.Inject
@@ -19,9 +20,26 @@ class DownloadQueueViewModel
 constructor(private val downloadQueue: DownloadQueue) : ViewModel() {
     val state: StateFlow<DownloadQueueState> =
         combine(downloadQueue.getQueue(), progressTicker()) { queue, _ ->
-                DownloadQueueState(items = queue.map { entry -> entry.toItem() })
+                DownloadQueueState(
+                    items =
+                        queue
+                            .sortedBy { entry ->
+                                when (entry.state) {
+                                    DownloadState.RUNNING -> 0
+                                    DownloadState.FAILED -> 1
+                                    DownloadState.QUEUED -> 2
+                                }
+                            }
+                            .map { entry -> entry.toItem() }
+                )
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), DownloadQueueState())
+
+    init {
+        // Background work can be killed off without the queue being told, so opening the page is
+        // taken as a chance to get it going again.
+        downloadQueue.start()
+    }
 
     fun onAction(action: DownloadQueueAction) {
         when (action) {
