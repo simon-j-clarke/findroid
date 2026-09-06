@@ -104,9 +104,9 @@ constructor(
             }
 
         downloadQueue.onDownloadStarted(entry)
-        setForeground(foregroundInfo(entry.seriesName ?: entry.name))
 
         try {
+            setForeground(foregroundInfo(entry.seriesName ?: entry.name))
             var lastUpdate = 0L
             mediaDownloader.download(prepared.url, File(prepared.path), prepared.resumable) {
                 downloaded,
