@@ -77,13 +77,40 @@ class DownloaderImpl(
             }
             val path =
                 Uri.fromFile(File(storageLocation, "downloads/${item.id}.${source.id}.download"))
+
+            // Transcoding a source that already fits costs the server an encode and gains
+            // nothing, and a transcode is produced as it is sent so it has no length to resume
+            // from. Height alone does not bound the size, so the bitrate is checked too.
+            val maxHeight =
+                appPreferences.getValue(appPreferences.downloadMaxHeight).toIntOrNull() ?: 0
+            val maxBitrate =
+                appPreferences.getValue(appPreferences.downloadMaxBitrate).toIntOrNull() ?: 0
+            val sourceHeight =
+                source.mediaStreams
+                    .filter { it.type == MediaStreamType.VIDEO }
+                    .mapNotNull { it.height }
+                    .maxOrNull() ?: 0
+            val sourceBitrate = source.bitrate ?: 0
+            val transcode =
+                (maxHeight > 0 && sourceHeight > maxHeight) ||
+                    (maxBitrate > 0 && sourceBitrate > maxBitrate)
+
+            // A transcode is written at the requested bitrate, so the source size is not what
+            // ends up on disk.
+            val expectedSize =
+                if (transcode && maxBitrate > 0 && sourceBitrate > maxBitrate) {
+                    source.size * maxBitrate / sourceBitrate
+                } else {
+                    source.size
+                }
+
             val stats = StatFs(storageLocation.path)
-            if (stats.availableBytes < source.size) {
+            if (stats.availableBytes < expectedSize) {
                 return@coroutineScope Pair(
                     null,
                     UiText.StringResource(
                         CoreR.string.not_enough_storage,
-                        Formatter.formatFileSize(context, source.size),
+                        Formatter.formatFileSize(context, expectedSize),
                         Formatter.formatFileSize(context, stats.availableBytes),
                     ),
                 )
@@ -131,18 +158,14 @@ class DownloaderImpl(
 
             startImagesDownloader(item)
 
-            // Transcoding a source that already fits costs the server an encode and gains
-            // nothing, and a transcode is produced as it is sent so it has no length to resume
-            // from.
-            val maxHeight = appPreferences.getValue(appPreferences.downloadMaxHeight).toIntOrNull()
-            val sourceHeight =
-                source.mediaStreams
-                    .filter { it.type == MediaStreamType.VIDEO }
-                    .mapNotNull { it.height }
-                    .maxOrNull()
             val transcodedUrl =
-                if (maxHeight != null && maxHeight > 0 && (sourceHeight ?: 0) > maxHeight) {
-                    jellyfinRepository.getTranscodedStreamUrl(item.id, sourceId, maxHeight)
+                if (transcode) {
+                    jellyfinRepository.getTranscodedStreamUrl(
+                        item.id,
+                        sourceId,
+                        maxHeight,
+                        maxBitrate,
+                    )
                 } else {
                     ""
                 }

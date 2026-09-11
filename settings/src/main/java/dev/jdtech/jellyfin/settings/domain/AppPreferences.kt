@@ -83,6 +83,7 @@ class AppPreferences @Inject constructor(val sharedPreferences: SharedPreference
     val downloadOverMobileData = Preference("pref_downloads_mobile_data", false)
     val downloadWhenRoaming = Preference("pref_downloads_roaming", false)
     val downloadMaxHeight = Preference("pref_downloads_max_height", "0")
+    val downloadMaxBitrate = Preference("pref_downloads_max_bitrate", "0")
 
     // Network
     val requestTimeout =

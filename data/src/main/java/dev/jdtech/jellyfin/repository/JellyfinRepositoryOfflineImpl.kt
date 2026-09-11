@@ -212,6 +212,7 @@ class JellyfinRepositoryOfflineImpl(
         itemId: UUID,
         mediaSourceId: String,
         maxHeight: Int,
+        maxBitrate: Int,
     ): String {
         return ""
     }

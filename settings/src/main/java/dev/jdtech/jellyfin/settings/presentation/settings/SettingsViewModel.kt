@@ -635,6 +635,15 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                                                     options = R.array.download_qualities,
                                                     optionValues = R.array.download_qualities_values,
                                                 ),
+                                                PreferenceSelect(
+                                                    nameStringResource =
+                                                        R.string.download_bitrate,
+                                                    supportedDeviceTypes = listOf(DeviceType.PHONE),
+                                                    backendPreference =
+                                                        appPreferences.downloadMaxBitrate,
+                                                    options = R.array.download_bitrates,
+                                                    optionValues = R.array.download_bitrates_values,
+                                                ),
                                                 PreferenceSwitch(
                                                     nameStringResource =
                                                         R.string.download_mobile_data,

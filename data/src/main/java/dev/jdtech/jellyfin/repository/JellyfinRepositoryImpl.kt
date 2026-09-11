@@ -342,6 +342,7 @@ class JellyfinRepositoryImpl(
         itemId: UUID,
         mediaSourceId: String,
         maxHeight: Int,
+        maxBitrate: Int,
     ): String =
         withContext(Dispatchers.IO) {
             try {
@@ -350,7 +351,8 @@ class JellyfinRepositoryImpl(
                     container = "mp4",
                     static = false,
                     mediaSourceId = mediaSourceId,
-                    maxHeight = maxHeight,
+                    maxHeight = maxHeight.takeIf { it > 0 },
+                    videoBitRate = maxBitrate.takeIf { it > 0 },
                     videoCodec = "h264",
                     audioCodec = "aac",
                 )

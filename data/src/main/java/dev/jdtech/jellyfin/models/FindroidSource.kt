@@ -14,6 +14,7 @@ data class FindroidSource(
     val path: String,
     val size: Long,
     val mediaStreams: List<FindroidMediaStream>,
+    val bitrate: Int? = null,
     val downloadId: Long? = null,
 )
 
@@ -42,6 +43,7 @@ suspend fun MediaSourceInfo.toFindroidSource(
         size = size ?: 0,
         mediaStreams =
             mediaStreams?.map { it.toFindroidMediaStream(jellyfinRepository) } ?: emptyList(),
+        bitrate = bitrate,
     )
 }
 

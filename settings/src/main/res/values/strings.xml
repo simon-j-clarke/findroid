@@ -31,6 +31,8 @@
     <string name="download_mobile_data">Download using mobile data</string>
     <string name="download_quality">Download quality</string>
     <string name="download_quality_original">Original</string>
+    <string name="download_bitrate">Download bitrate</string>
+    <string name="download_bitrate_original">Original</string>
     <string name="download_roaming">Download when roaming</string>
     <string name="mpv_player_summary">Use the experimental mpv player to play videos. mpv has support for more video, audio and subtitle codecs.</string>
     <string name="gestures">Gestures</string>

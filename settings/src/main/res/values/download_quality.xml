@@ -12,4 +12,22 @@
         <item>720</item>
         <item>480</item>
     </string-array>
+    <string-array name="download_bitrates">
+        <item>@string/download_bitrate_original</item>
+        <item>20 Mbps</item>
+        <item>10 Mbps</item>
+        <item>8 Mbps</item>
+        <item>7 Mbps</item>
+        <item>4 Mbps</item>
+        <item>2 Mbps</item>
+    </string-array>
+    <string-array name="download_bitrates_values" translatable="false">
+        <item>0</item>
+        <item>20000000</item>
+        <item>10000000</item>
+        <item>8000000</item>
+        <item>7000000</item>
+        <item>4000000</item>
+        <item>2000000</item>
+    </string-array>
 </resources>
